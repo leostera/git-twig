@@ -21,6 +21,8 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Added
 
+- Windows x64 CI and release ZIPs for `git-twig.exe`. On Windows, creation
+  delegates to Git and uses ordinary worktree checkouts.
 - Native coverage for supported identity-checkout policies, including
   `text=auto eol=lf` and applicable `core.autocrlf=input` configurations.
 - Hybrid creation: Git writes files requiring line-ending conversion or whose

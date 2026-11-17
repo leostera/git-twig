@@ -16,6 +16,8 @@ jobs:
             filesystem: xfs
           - os: ubuntu-latest
             filesystem: btrfs
+          - os: windows-latest
+            filesystem: ntfs
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

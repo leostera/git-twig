@@ -9,6 +9,7 @@ use std::{
 
 #[path = "cases/checkout_policy.rs"]
 mod checkout_policy;
+#[cfg(unix)]
 #[path = "cases/checkout_races.rs"]
 mod checkout_races;
 #[path = "cases/fallback_diagnostics.rs"]
@@ -36,6 +37,10 @@ impl Fixture {
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&root)?;
+        // Git for Windows config paths cannot use Rust's verbatim path prefix.
+        #[cfg(windows)]
+        let root = std::path::absolute(root)?;
+        #[cfg(not(windows))]
         let root = fs::canonicalize(root)?;
         let source = root.join("source");
         fs::create_dir(&source)?;
@@ -227,6 +232,7 @@ fn disabled_symlinks_delegate_for_root_and_nested_entries() -> Result<()> {
 fn legacy_crlf_attributes_cannot_hide_dirty_raw_bytes() -> Result<()> {
     for attribute in ["crlf", "crlf=input"] {
         let f = Fixture::new()?;
+        git(&f.source, &["config", "core.eol", "lf"])?;
         fs::create_dir(f.source.join("tree"))?;
         fs::write(f.source.join("tree/file.txt"), "hello\n")?;
         fs::write(
@@ -557,6 +563,44 @@ fn git_c_main_layout_creates_a_sibling_from_head() -> Result<()> {
     clean(&f.root.join("feat-x"))
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_worktree_lifecycle_uses_git_without_staging() -> Result<()> {
+    let f = Fixture::new()?;
+    git(&f.source, &["config", "core.autocrlf", "true"])?;
+    let bin = Path::new(env!("CARGO_BIN_EXE_git-twig")).parent().unwrap();
+    let path = std::env::join_paths(std::iter::once(bin.to_path_buf()).chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))?;
+    let git_twig = |args: &[&str]| {
+        checked(
+            command("git", &f.root)
+                .env("PATH", &path)
+                .args(["-C", "source", "twig"])
+                .args(args)
+                .output()?,
+        )
+    };
+    let destination = f.root.join("feature café");
+    let output = git_twig(&["new", "-b", "feature", "../feature café", "HEAD"])?;
+    let trace = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        trace.contains("stock Git: native CoW is supported only on macOS and Linux"),
+        "{trace}"
+    );
+    assert_eq!(fs::read(destination.join("hello.txt"))?, b"hello\r\n");
+    clean(&destination)?;
+    assert_eq!(
+        git_twig(&["list", "--porcelain"])?.stdout,
+        git(&f.source, &["worktree", "list", "--porcelain"])?.stdout
+    );
+    git_twig(&["remove", "../feature café"])?;
+    assert!(!destination.exists());
+    assert!(!f.staging_root().exists());
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn linked_source_retains_failed_staging_in_the_common_git_directory() -> Result<()> {
     let f = Fixture::new()?;
@@ -1113,6 +1157,7 @@ fn relative_destination_from_subdirectory_is_resolved_correctly() -> Result<()> 
     clean(&f.destination())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn sixteen_independent_native_creators_register_safely() -> Result<()> {
     let f = Fixture::new()?;
@@ -1139,6 +1184,7 @@ fn sixteen_independent_native_creators_register_safely() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn concurrent_creators_do_not_overwrite_each_other() -> Result<()> {
     let f = Fixture::new()?;

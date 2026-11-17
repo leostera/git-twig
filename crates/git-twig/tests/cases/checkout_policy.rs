@@ -48,16 +48,24 @@ fn compare_stock(f: &Fixture, paths: &[&str], require_native: bool) -> Result<Ou
     if require_native {
         native(&output);
     }
+    let destination = f.destination();
+    let stock = f.root.join("stock");
     for name in paths {
-        assert_eq!(
-            fs::read(f.destination().join(name))?,
-            fs::read(f.root.join("stock").join(name))?,
-            "{name}"
-        );
+        let actual = destination.join(name);
+        let expected = stock.join(name);
+        assert_eq!(fs::read(&actual)?, fs::read(&expected)?, "{name}");
+        // Invalidate both Git stat-cache entries so that status checks the
+        // content in both worktrees even if their checkout timestamps differ.
+        for path in [actual, expected] {
+            fs::OpenOptions::new()
+                .write(true)
+                .open(path)?
+                .set_modified(UNIX_EPOCH)?;
+        }
     }
     assert_eq!(
-        git(&f.destination(), &["status", "--porcelain"])?.stdout,
-        git(&f.root.join("stock"), &["status", "--porcelain"])?.stdout
+        git(&destination, &["status", "--porcelain"])?.stdout,
+        git(&stock, &["status", "--porcelain"])?.stdout
     );
     Ok(output)
 }
@@ -341,6 +349,7 @@ fn copied_worktree_config_keeps_absolute_includes_but_delegates_relative_ones() 
         let output = compare_stock(&f, &["hello.txt", ".gitattributes"], !relative)?;
         if relative {
             let trace = String::from_utf8_lossy(&output.stderr);
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
             assert!(
                 trace.contains("relative config.worktree includes require stock Git"),
                 "{trace}"
@@ -440,7 +449,10 @@ fn failing_filters_run_once_through_stock_git_and_retain_failure() -> Result<()>
     assert!(!String::from_utf8_lossy(&output.stderr).contains("CoW: verified"));
     assert_eq!(fs::read_to_string(marker)?, "call\n");
     assert_eq!(fs::read(f.source.join("hello.txt"))?, LF);
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     assert!(!f.stages()?.is_empty());
+    #[cfg(windows)]
+    assert!(!f.staging_root().exists());
     Ok(())
 }
 

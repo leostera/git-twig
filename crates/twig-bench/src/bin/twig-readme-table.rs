@@ -86,17 +86,17 @@ fn main() -> Result<()> {
     let start = readme.find(START).context("start marker")? + START.len();
     let end = readme.find(END).context("end marker")?;
     ensure!(start <= end, "reversed benchmark markers");
-    let generated = format!("{}{}{}", &readme[..start], block, &readme[end..]);
     if check {
         ensure!(
-            generated == readme,
+            readme[start..end].replace("\r\n", "\n") == block,
             "README benchmark table is stale; run cargo run -p twig-bench --bin twig-readme-table"
         );
         ensure!(
-            fs::read_to_string("bench/results/readme-details.md")? == details,
+            fs::read_to_string("bench/results/readme-details.md")?.replace("\r\n", "\n") == details,
             "benchmark details are stale"
         );
     } else {
+        let generated = format!("{}{}{}", &readme[..start], block, &readme[end..]);
         fs::write("README.md", generated)?;
         fs::write("bench/results/readme-details.md", details)?;
     }

@@ -9,6 +9,7 @@ fn reason(output: &Output, expected: &str) {
     assert!(!stderr.contains("CoW: verified tracked files"), "{stderr}");
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn attributes_name_the_path_key_and_literal_value() -> Result<()> {
     for value in ["unset", "unspecified", "upper"] {
@@ -39,10 +40,13 @@ fn environment_overrides_are_named_and_trace_is_opt_in() -> Result<()> {
             .env("GIT_ATTR_SOURCE", "HEAD")
             .output()?,
     )?;
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     reason(
         &output,
         "environment override GIT_ATTR_SOURCE requires stock Git",
     );
+    #[cfg(windows)]
+    reason(&output, "native CoW is supported only on macOS and Linux");
     clean(&f.destination())?;
 
     let f = Fixture::new()?;
@@ -58,6 +62,7 @@ fn environment_overrides_are_named_and_trace_is_opt_in() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn attribute_paths_are_escaped_in_diagnostics() -> Result<()> {
     let f = Fixture::new()?;
@@ -90,6 +95,7 @@ fn unsupported_creation_syntax_explains_the_supported_subset() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn revision_and_sparse_checkout_have_distinct_reasons() -> Result<()> {
     let f = Fixture::new()?;
@@ -105,6 +111,7 @@ fn revision_and_sparse_checkout_have_distinct_reasons() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn destination_reasons_preserve_existing_paths_and_git_parent_creation() -> Result<()> {
     let f = Fixture::new()?;
@@ -121,6 +128,7 @@ fn destination_reasons_preserve_existing_paths_and_git_parent_creation() -> Resu
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn hooks_and_disabled_symlinks_are_identified() -> Result<()> {
     for event in ["reference-transaction", "post-index-change"] {
@@ -141,6 +149,7 @@ fn hooks_and_disabled_symlinks_are_identified() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn gitlinks_are_reported_as_submodules() -> Result<()> {
     let f = Fixture::new()?;

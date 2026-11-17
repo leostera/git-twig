@@ -29,7 +29,8 @@ Git reserves git twig --help for the installed manual; use git twig -h
 or git-twig --help if no manual is installed.
 
 Native CoW requires the source checkout's HEAD and macOS/APFS or Linux reflinks.
-Other requests and unsupported worktree options use stock Git. Requires Git 2.40+.
+Windows, other requests and unsupported worktree options use stock Git.
+Requires Git 2.40+.
 Set TWIG_TRACE=1 to report backend selection to stderr.
 ";
 

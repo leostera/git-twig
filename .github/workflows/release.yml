@@ -15,19 +15,35 @@ jobs:
             target: x86_64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: |
-          python3 scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
-          cargo test --workspace --locked
-          cargo build --release --locked -p git-twig --target ${{ matrix.target }}
+      - name: Verify version on Unix
+        if: runner.os != 'Windows'
+        run: python3 scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
+      - name: Verify version on Windows
+        if: runner.os == 'Windows'
+        run: python scripts/check-release-version.py $env:GITHUB_REF_NAME.Substring(1)
+      - run: cargo test --workspace --locked
+      - run: cargo build --release --locked -p git-twig --target ${{ matrix.target }}
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        run: |
           mkdir -p package dist
           cp target/${{ matrix.target }}/release/git-twig LICENSE README.md crates/git-twig/man/git-twig.1 package/
           tar -czf dist/git-twig-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz -C package .
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist
+          $binary = 'target/${{ matrix.target }}/release/git-twig.exe'
+          Compress-Archive -Path $binary, LICENSE, README.md -DestinationPath "dist/git-twig-$env:GITHUB_REF_NAME-${{ matrix.target }}.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
@@ -47,7 +63,7 @@ jobs:
           path: dist
           merge-multiple: true
       - run: |
-          sha256sum dist/*.tar.gz > dist/SHA256SUMS
+          sha256sum dist/*.tar.gz dist/*.zip > dist/SHA256SUMS
           python3 scripts/release-formula.py "${GITHUB_REF_NAME#v}" dist > Formula/git-twig.rb
           cp Formula/git-twig.rb dist/git-twig.rb
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes

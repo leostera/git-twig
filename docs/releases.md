@@ -18,9 +18,10 @@ Before publishing:
 
 With owner approval, push a vVERSION tag matching Cargo.toml. The release workflow
 builds macOS arm64/x86_64 and Linux x86_64 archives (including `git-twig.1`),
-SHA256SUMS and a stable Homebrew formula. It creates a GitHub release and updates the same repository's
+a Windows x86_64 ZIP with `git-twig.exe`, SHA256SUMS for the archives, and a
+stable Homebrew formula. It creates a GitHub release and updates the same repository's
 Formula/git-twig.rb. Native CoW supports macOS/APFS and Linux on Btrfs or
-reflink-enabled XFS; unsupported filesystems delegate to Git. macOS binaries are
+reflink-enabled XFS. Windows and unsupported filesystems delegate to Git. macOS binaries are
 not signed/notarized yet.
 
 Homebrew needs the explicit remote because the repository is not named

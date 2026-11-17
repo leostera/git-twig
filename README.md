@@ -17,6 +17,11 @@ cargo install git-twig --locked
 
 For local development: `cargo install --path crates/git-twig --locked`.
 
+On Windows, install [Git for Windows](https://gitforwindows.org/) 2.40+ and use
+the local development command above with Rust 1.95+, or extract `git-twig.exe`
+from a Windows x64 release ZIP when available. Put the directory containing
+`git-twig.exe` on your `PATH` and run `git twig -h` to verify the installation.
+
 ## Use
 
 With your source checkout in `main/`:
@@ -32,6 +37,7 @@ Short help works outside a checkout: `git twig -h` or `git twig new --help`.
 For coding agents: `git twig skill` prints the bundled skill.
 
 Native CoW supports macOS/APFS and Linux on Btrfs or reflink-enabled XFS.
+On Windows, Twig uses Git to create standard linked worktrees without CoW savings.
 Creates ordinary linked worktrees from committed files; local changes and ignored
 files aren't copied. Unsupported filesystems (including typical ext4), options and
 checkout semantics use `git worktree`. Set `TWIG_TRACE=1` to see backend selection.
