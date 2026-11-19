@@ -45,6 +45,12 @@ Git directory, where Git lists the main checkout at a path holding no checkout.
 for root, nested, symlink and Git-rewritten entries, and same-size dirty donor
 bytes to be rewritten rather than recorded as clean.
 
+`cases/removal.rs` removes a worktree whose absolute paths exceed PATH_MAX, which
+Git unregisters but cannot delete, and requires no directory or registration to
+remain. With the same paths, Git's refusals for untracked files and locks
+(including `--force` on a locked worktree) must leave the checkout and
+registration intact. Twig deletes only the one checkout Git unregistered.
+
 These are finite generated cases, not exhaustive proofs or a randomized shrinking
 framework. The generation seed and fixture are retained. Parallel launch varies
 scheduling but does not force every interleaving. The registration fault injection

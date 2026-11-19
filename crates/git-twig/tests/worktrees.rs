@@ -31,6 +31,9 @@ mod partial_clones;
 mod safety_properties;
 
 #[cfg(unix)]
+#[path = "cases/removal.rs"]
+mod removal;
+#[cfg(unix)]
 #[path = "cases/staging_cleanup.rs"]
 mod staging_cleanup;
 

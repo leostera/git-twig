@@ -64,6 +64,11 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- `git twig remove` deletes worktrees whose absolute paths exceed the system
+  limit (1024 bytes on macOS). Git unregistered them, failed with "File name
+  too long" and left the directory behind. Twig finishes deleting only the
+  checkout Git has just unregistered, so Git's checks for changes and locks
+  still apply.
 - macOS offline compaction no longer reports its primitives unavailable when
   an indexer such as Spotlight briefly opens the capability probe's files.
 - SIGINT, SIGTERM or SIGHUP before registration removes this invocation's

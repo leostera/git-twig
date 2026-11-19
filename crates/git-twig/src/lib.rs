@@ -11,6 +11,7 @@ mod index;
 mod native;
 mod objects;
 mod registry;
+mod remove;
 mod sharing;
 mod signals;
 mod snapshot;
@@ -33,6 +34,9 @@ use tree::{Entry, Kind};
 pub fn run(cwd: &Path, args: &[OsString]) -> Result<i32> {
     if args.first().is_some_and(|arg| arg == "adopt") {
         return adopt::run(cwd, &args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "remove") {
+        return remove::run(cwd, args);
     }
     ensure!(
         args.first().is_none_or(|arg| arg != "add"),
