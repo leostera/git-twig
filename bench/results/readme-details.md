@@ -12,13 +12,15 @@
 | Twig create | 4.27 s | 4.18 s | 0.95 s | 31.32 s | 8.80 s | 3.64 s |
 | Git first status (median) | 0.02 s | 0.02 s | 0.14 s | 0.55 s | 0.46 s | 0.51 s |
 | Twig first status (median) | 0.02 s | 0.02 s | 0.17 s | 17.25 s | 6.65 s | 3.71 s |
+| Git create + first status | 0.62 s | 0.57 s | 0.54 s | 40.96 s | 8.92 s | 4.68 s |
+| Twig create + first status | 4.41 s | 4.35 s | 1.12 s | 48.58 s | 15.71 s | 7.40 s |
 | Git allocation | 0.6 MiB | 5.2 MiB | 30.8 MiB | 1874.5–1875.4 MiB | 917.7–919.1 MiB | 1237.6 MiB |
 | Twig allocation | 0.3 MiB | 0.5 MiB | 1.2 MiB | 44.7 MiB | 31.1 MiB | 7.8–7.9 MiB |
 | paired timing rounds | 3 | 3 | 3 | 3 | 3 | 3 |
 | Git / Twig failed attempts | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
 | status | completed | completed | completed | completed | completed | completed |
 
-Creation is wall time for the entire batch, excluding first status. Values are medians of recorded rounds; one round is an observation, not a stable estimate. Allocation is additional filesystem-allocated MiB after first status, including indexes, staging and APFS metadata. Ranges retain observed allocator variation, not confidence intervals. Multipliers use unrounded point estimates. Missing measurements are not zeros; logical size and du do not measure exclusive APFS allocation.
+Creation is wall time for the entire batch, excluding first status. Create + first status adds each successful worktree's first `git status`, run one at a time after all creates; the README summary and its multipliers use it. Values are medians of recorded rounds; one round is an observation, not a stable estimate. Allocation is additional filesystem-allocated MiB after first status, including indexes, staging and APFS metadata. Ranges retain observed allocator variation, not confidence intervals. Multipliers use unrounded point estimates. Missing measurements are not zeros; logical size and du do not measure exclusive APFS allocation.
 
 - Warm-cache observations on a shared Apple M1 Ultra Mac using Git 2.56.1; three paired rounds per workload/backend/environment. These are not cold-cache results, load-saturation tests or universal speed guarantees.
 - The headline runs contain 282 verified measured creates with zero failures, independently checking raw bytes, executable modes, symlink targets, native Twig selection and source isolation after private writes. Warmups are additional and not counted as measured creates.
