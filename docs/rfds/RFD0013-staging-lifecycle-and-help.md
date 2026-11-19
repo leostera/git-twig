@@ -8,8 +8,9 @@
 
 Keep materialized staging under the common Git directory in `twigs/staging`, not
 beside user worktrees. Remove only this invocation's staging after a successful
-create, including a successful Git fallback. Retain failed/interrupted operations
-for diagnosis. Existing leftovers are never discovered or deleted automatically.
+create, including a successful Git fallback, and after SIGHUP, SIGINT or SIGTERM
+before registration. Retain other failed or interrupted operations for diagnosis.
+Existing leftovers are never discovered or deleted automatically.
 
 Provide short help before repository discovery. Git itself intercepts top-level
 `git twig --help` for a man-page lookup: install a manual with Homebrew and binary
@@ -38,6 +39,18 @@ path is part of cleanup. A crash during bootstrap relocation can retain a privat
 empty bootstrap beside the destination; diagnostics/cleanup remain scoped to the
 current invocation when it is still running.
 
+Native creation defers SIGHUP, SIGINT and SIGTERM until registration starts.
+Bulk APFS directory clones ([RFD0010](RFD0010-bulk-directory-cloning.md)) briefly
+hold ignored and untracked files until pruning, and nothing refers to staging
+before registration. A deferred signal therefore stops work at the next check
+(before verification, fallback or registration), removes this invocation's
+staging, and terminates by that signal; Git children in the foreground process
+group fail on the same interrupt. Neither registration nor stock-Git fallback
+starts after it. The previous dispositions return just before registration, so
+later signals keep the retain-for-inspection behavior. Ignored or already handled
+signals are left alone. SIGKILL cannot be handled and retains staging like any
+other crash.
+
 ## Help and documentation
 
 Bundle `git-twig.1` and install it from both Homebrew source and stable archives.
@@ -49,12 +62,13 @@ HEAD requirement explicit. This does not create a new fast path for older commit
 
 ## Validation
 
-Test native success cleanup, successful fallback cleanup, private retained staging
-on native/hook failure, linked-source common-directory placement, concurrent
-creators, restrictive umasks and Linux setgid inheritance. Preserve existing
-cross-filesystem and byte-verification tests. Drive help through the real `git`
-external-command dispatcher outside a repository, not only the binary. Check
-manual packaging, generated formula installation and package contents.
+Test native success cleanup, successful fallback cleanup, removal on SIGINT and
+SIGTERM before registration, private retained staging on native/hook failure,
+linked-source common-directory placement, concurrent creators, restrictive umasks
+and Linux setgid inheritance. Preserve existing cross-filesystem and
+byte-verification tests. Drive help through the real `git` external-command
+dispatcher outside a repository, not only the binary. Check manual packaging,
+generated formula installation and package contents.
 
 ## Alternatives and limits
 

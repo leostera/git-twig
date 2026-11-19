@@ -1,4 +1,5 @@
-//! Per-invocation staging ownership. Only successful commands discard their scratch.
+//! Per-invocation staging ownership. Only successful commands, and commands interrupted
+//! before registration, discard their scratch.
 use anyhow::{Context, Result};
 use std::{
     fs,
@@ -55,7 +56,7 @@ impl Staging {
         Ok(checkout)
     }
 
-    pub fn cleanup(&mut self) {
+    pub fn cleanup(&mut self, outcome: &str) {
         for path in self
             .bootstrap
             .take()
@@ -69,7 +70,7 @@ impl Staging {
                 });
             if let Err(error) = result {
                 eprintln!(
-                    "git-twig: command succeeded; could not remove staging at {}: {error:#}",
+                    "git-twig: {outcome}; could not remove staging at {}: {error:#}",
                     path.display()
                 );
             }

@@ -89,8 +89,9 @@ and relative attribute-file configuration delegate to stock Git.
 Checkout configuration and external attributes must not change during creation.
 .SH STAGING
 Staging is stored under the common Git directory in twigs/staging. Successful
-operations remove their own staging. Failed/interrupted attempts retain diagnostic
-state; inspect reported paths and registrations before retrying or deleting.
+operations remove their own staging, as do SIGINT, SIGTERM and SIGHUP before
+registration. Other failed or interrupted attempts retain diagnostic state;
+inspect reported paths and registrations before retrying or deleting.
 The selected donor, destination and Git metadata must share a clone-capable filesystem for
 the native path; unsupported layouts delegate to Git.
 .SH HELP

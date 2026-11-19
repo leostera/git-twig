@@ -48,8 +48,9 @@ to see backend selection.
 The selected donor, destination and Git metadata must share a clone-capable filesystem for
 native CoW. Twig verifies cloned files against the requested commit; writes are
 private, never hardlinked to source. Staging lives under the common Git directory
-in `twigs/staging` and is removed after success. Failed/interrupted attempts retain
-staging and may leave a partial registered worktree; inspect before retrying.
+in `twigs/staging` and is removed after success, or on SIGINT/SIGTERM/SIGHUP before
+registration. Other failed or interrupted attempts retain staging and may leave a
+partial registered worktree; inspect before retrying.
 
 ### Organize existing worktrees (development main)
 

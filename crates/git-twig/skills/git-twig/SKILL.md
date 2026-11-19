@@ -234,7 +234,8 @@ staging blindly. After approval, use `git twig remove <path>`; retain branches
 and commits unless their deletion was separately authorized.
 
 Staging lives under the common Git directory in `twigs/staging`. A successful
-create removes only its own staging. Failed/interrupted attempts retain diagnostic
-state; inspect `git twig list` and the reported staging paths, since a partial
+create removes only its own staging, as does SIGINT, SIGTERM or SIGHUP before
+registration. Other failed or interrupted attempts retain diagnostic state;
+inspect `git twig list` and the reported staging paths, since a partial
 worktree may already be registered. Do not retry into it or delete it automatically.
 Older sibling staging folders are not swept or deleted by new commands.

@@ -62,6 +62,13 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- SIGINT, SIGTERM or SIGHUP before registration removes this invocation's
+  staging, which bulk directory clones can briefly fill with ignored files, and
+  starts no stock Git fallback. Later interrupts still retain staging; SIGKILL
+  cannot be handled. Issue #10 (dsfaccini).
+- A revision that moves while Twig verifies its clones no longer registers the
+  moved commit: `--detach` registers the verified commit, and `-b` delegates to
+  stock Git before registering if its start point moved. Issue #7 (dsfaccini).
 - Conditional config includes (`includeIf`) no longer force stock Git when the
   included files set only identity, signing, remote, credential or alias
   settings, which never change checkout bytes. Includes that set anything else,

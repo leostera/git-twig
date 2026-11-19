@@ -192,6 +192,56 @@ fn registration_failure_and_abrupt_exit_preserve_recoverable_state() -> Result<(
     Ok(())
 }
 
+#[test]
+fn interrupts_before_registration_remove_staging() -> Result<()> {
+    use std::os::unix::process::ExitStatusExt;
+    for (action, signal) in [
+        (r#"kill -INT "$PPID""#, libc::SIGINT),
+        (r#"kill -TERM "$PPID""#, libc::SIGTERM),
+        // A terminal interrupt reaches the whole process group, including Git.
+        // The send runs in a subshell ignoring SIGINT: on macOS a sender that
+        // dies of its own kill(0) can stop delivery to the rest of the group.
+        // Git then fails the way an interrupted Git does.
+        ("(trap '' INT; kill -INT 0); exit 130", libc::SIGINT),
+    ] {
+        let f = Fixture::new()?;
+        #[cfg(target_os = "linux")]
+        if !linux_reflinks_available(&f)? {
+            continue;
+        }
+        let before = inventory(&f.source)?;
+        let output = during_verification(&f, action)?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.signal(), Some(signal), "{action}: {stderr}");
+        assert!(f.root.join("interrupted").is_dir(), "{action}: {stderr}");
+        assert!(!stderr.contains("stock Git"), "{action}: {stderr}");
+        assert!(f.stages()?.is_empty(), "{action}: {stderr}");
+        f.assert_no_sibling_stages()?;
+        assert!(fs::symlink_metadata(f.destination()).is_err());
+        assert_eq!(registration_count(&f)?, 1);
+        assert_eq!(inventory(&f.source)?, before);
+    }
+    Ok(())
+}
+
+/// Signal Twig once, while Git hashes private clones before registration.
+fn during_verification(f: &Fixture, action: &str) -> Result<Output> {
+    wrapped_twig(
+        f,
+        &format!(
+            r#"#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "hash-object" ] && mkdir "$TWIG_TEST_INTERRUPTED" 2>/dev/null; then
+    {action}
+  fi
+done
+exec "$TWIG_TEST_REAL_GIT" "$@"
+"#
+        ),
+        &["new", "--detach", "../feature", "HEAD"],
+    )
+}
+
 fn after_registration(f: &Fixture, action: &str) -> Result<Output> {
     wrapped_twig(
         f,
@@ -240,6 +290,7 @@ fn wrapped_twig(f: &Fixture, script: &str, args: &[&str]) -> Result<Output> {
         .env("TWIG_TEST_REAL_GIT", real_git.trim())
         .env("TWIG_TEST_MARKER", f.root.join("marker"))
         .env("TWIG_TEST_LATE_FAILURE", f.root.join("late-failure"))
+        .env("TWIG_TEST_INTERRUPTED", f.root.join("interrupted"))
         .env("TWIG_TEST_SOURCE", &f.source)
         .env("TWIG_TEST_DESTINATION", f.destination());
     bounded_output(child)
