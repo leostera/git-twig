@@ -38,6 +38,10 @@ mod staging_cleanup;
 #[path = "cases/donor_metadata.rs"]
 mod donor_metadata;
 
+#[cfg(windows)]
+#[path = "cases/windows_mounts.rs"]
+mod windows_mounts;
+
 #[path = "cases/adopt.rs"]
 mod adopt;
 

@@ -59,6 +59,10 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- Windows: a repository on a volume mounted at a folder, rather than a drive
+  letter, now clones natively. Twig asked which volume held the mount point
+  itself and sent every creation to stock Git. Adoption no longer refuses a
+  main checkout directly under such a folder.
 - `core.eol=native` is CRLF in Git for Windows; `text` paths are no longer left
   with LF line endings there.
 

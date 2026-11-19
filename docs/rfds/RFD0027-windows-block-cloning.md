@@ -39,7 +39,11 @@ and fixed line-ending assumptions in the repository's own checks.
   fallback costs one volume query, and says why: "volume does not support block
   cloning (ReFS or a Dev Drive is required)".
 - **One volume.** Staging, destination and donor must share a volume serial
-  number, the Windows counterpart of comparing device numbers.
+  number, the Windows counterpart of comparing device numbers. The check
+  follows links, as `fs::metadata` does on Unix: a volume mounted at a folder
+  (common for Dev Drives in a VHDX) is the volume inside the folder, not the
+  one holding the mount point. Asking without following the mount point sent
+  every worktree beside such a repository to stock Git.
 - **Paths.** `fs::canonicalize` returns verbatim `\\?\C:\...` paths, which Git
   for Windows does not accept. Twig resolves them, then uses the ordinary form
   when it names the same file, and refuses a path with no ordinary form. Paths

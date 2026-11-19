@@ -390,7 +390,7 @@ mod layout {
                 "worktrees directory is on a different filesystem; cross-device relocation is unsupported"
             );
             ensure!(
-                identity(repository.main.parent().context("main has no parent")?)?.device == device,
+                self::device(repository.main.parent().context("main has no parent")?)? == device,
                 "main checkout is a mount point; cannot park it safely"
             );
             for (i, record) in repository.records.iter().enumerate() {

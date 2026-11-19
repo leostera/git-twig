@@ -425,10 +425,16 @@ fn control<I, O>(file: &File, code: u32, input: Option<&I>, output: Option<&mut 
     Ok(())
 }
 
-/// A volume's serial number: equal numbers mean a rename or clone can stay on
-/// one volume. Directories are opened too, without following reparse points.
+/// The serial number of the volume holding what a path names, followed through
+/// links like `fs::metadata`: equal numbers mean a rename or clone can stay on
+/// one volume. A volume mounted at a folder is the one inside the folder, not
+/// the volume holding the mount point.
 pub fn volume_identity(path: &Path) -> Result<u32> {
-    Ok(identity(path)?.volume)
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)?;
+    Ok(identity_of(&file)?.volume)
 }
 
 /// What a path names, without following a final reparse point: the Windows
