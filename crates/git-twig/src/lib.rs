@@ -55,7 +55,7 @@ pub fn run(cwd: &Path, args: &[OsString]) -> Result<i32> {
 fn run_request(cwd: &Path, args: &[OsString], staging: &mut staging::Staging) -> Result<i32> {
     if let Some(request) = AddRequest::parse(args) {
         match prepare(cwd, &request, staging) {
-            Ok(prepared) => return install(cwd, args, prepared),
+            Ok(prepared) => return install(cwd, args, &request, prepared),
             Err(error) => trace(&format!("stock Git: {error:#}")),
         }
     } else if args.first().is_some_and(|arg| arg == "add") {
@@ -63,6 +63,10 @@ fn run_request(cwd: &Path, args: &[OsString], staging: &mut staging::Staging) ->
             "stock Git: creation options require Git; native creation supports -b or --detach, a destination, and an optional revision",
         );
     }
+    stock(cwd, args)
+}
+
+fn stock(cwd: &Path, args: &[OsString]) -> Result<i32> {
     Ok(git(cwd)
         .arg("worktree")
         .args(args)
@@ -82,6 +86,7 @@ struct AddRequest {
     branch: Option<OsString>,
     destination: PathBuf,
     revision: OsString,
+    detach: bool,
 }
 
 impl AddRequest {
@@ -91,6 +96,7 @@ impl AddRequest {
         }
         let mut index = 1;
         let mut branch = None;
+        let detach = matches!(args.get(index)?.to_str(), Some("--detach" | "-d"));
         if args.get(index)? == "-b" {
             let name = args.get(index + 1)?;
             if name.is_empty() || name.to_string_lossy().starts_with('-') {
@@ -98,7 +104,7 @@ impl AddRequest {
             }
             branch = Some(name.clone());
             index += 2;
-        } else if matches!(args.get(index)?.to_str(), Some("--detach" | "-d")) {
+        } else if detach {
             index += 1;
         } else {
             // Omitted branch has Git's branch-name inference semantics. Delegate for now.
@@ -120,8 +126,21 @@ impl AddRequest {
             branch,
             destination: destination.into(),
             revision,
+            detach,
         })
     }
+}
+
+fn resolve_commit(root: &Path, revision: &OsString) -> Result<String> {
+    text(
+        checked(
+            git(root)
+                .arg("rev-parse")
+                .arg("--verify")
+                .arg(format!("{}^{{commit}}", revision.to_string_lossy())),
+        )?
+        .stdout,
+    )
 }
 
 struct Prepared {
@@ -154,15 +173,7 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
         );
     }
     let root = output_path(checked(git(cwd).args(["rev-parse", "--show-toplevel"]))?.stdout)?;
-    let commit = text(
-        checked(
-            git(&root)
-                .arg("rev-parse")
-                .arg("--verify")
-                .arg(format!("{}^{{commit}}", request.revision.to_string_lossy())),
-        )?
-        .stdout,
-    )?;
+    let commit = resolve_commit(&root, &request.revision)?;
     if let Some(branch) = &request.branch {
         ensure_new_branch(&root, branch)?;
     }
@@ -282,13 +293,7 @@ fn ensure_new_branch(root: &Path, branch: &OsString) -> Result<()> {
     Ok(())
 }
 
-fn install(cwd: &Path, args: &[OsString], prepared: Prepared) -> Result<i32> {
-    #[cfg(target_os = "macos")]
-    trace("APFS CoW: verified tracked files");
-    #[cfg(target_os = "linux")]
-    trace("Linux reflink CoW: verified tracked files");
-    #[cfg(windows)]
-    trace("Windows block clone CoW: verified tracked files");
+fn install(cwd: &Path, args: &[OsString], request: &AddRequest, prepared: Prepared) -> Result<i32> {
     // Git enumerates peer worktree metadata while registering. Serialize Twig registrars
     // so none observes a peer between mkdir and writing commondir/HEAD.
     let registration_lock = lock_registration(&prepared.root)?;
@@ -297,11 +302,33 @@ fn install(cwd: &Path, args: &[OsString], prepared: Prepared) -> Result<i32> {
     prepared.policy.ensure_same(
         &checkout::Checkout::new(&prepared.root, &data, &index)?.policy(&prepared.entries)?,
     )?;
+    // The requested revision may name a ref that moved after preparation resolved it.
+    let mut register = git(cwd);
+    register.args(["worktree", "add", "--no-checkout"]);
+    if request.detach {
+        register
+            .arg("--detach")
+            .arg(&request.destination)
+            .arg(&prepared.commit);
+    } else if resolve_commit(&prepared.root, &request.revision)
+        .is_ok_and(|commit| commit == prepared.commit)
+    {
+        // Git needs the start point as named to set up upstream tracking for the branch.
+        // The ref can still move before Git resolves it; finish_install rejects that.
+        register.args(&args[1..]);
+    } else {
+        drop(registration_lock);
+        trace("stock Git: requested revision moved during native preparation");
+        return stock(cwd, args);
+    }
+    #[cfg(target_os = "macos")]
+    trace("APFS CoW: verified tracked files");
+    #[cfg(target_os = "linux")]
+    trace("Linux reflink CoW: verified tracked files");
+    #[cfg(windows)]
+    trace("Windows block clone CoW: verified tracked files");
     // Preserve Git's branch validation and registration. No fallback after this mutation.
-    let status = git(cwd)
-        .args(["worktree", "add", "--no-checkout"])
-        .args(&args[1..])
-        .status()?;
+    let status = register.status()?;
     if !status.success() {
         return Ok(status.code().unwrap_or(1));
     }

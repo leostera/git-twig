@@ -193,12 +193,9 @@ fn registration_failure_and_abrupt_exit_preserve_recoverable_state() -> Result<(
 }
 
 fn after_registration(f: &Fixture, action: &str) -> Result<Output> {
-    let bin = f.root.join("bin");
-    fs::create_dir(&bin)?;
-    let wrapper = bin.join("git");
-    fs::write(
-        &wrapper,
-        format!(
+    wrapped_twig(
+        f,
+        &format!(
             r#"#!/bin/sh
 if [ -f "$TWIG_TEST_LATE_FAILURE" ]; then
   for arg in "$@"; do
@@ -221,7 +218,16 @@ fi
 exit "$status"
 "#
         ),
-    )?;
+        &["new", "--detach", "../feature", "HEAD"],
+    )
+}
+
+/// Run Twig with `script` installed as the `git` found first on PATH.
+fn wrapped_twig(f: &Fixture, script: &str, args: &[&str]) -> Result<Output> {
+    let bin = f.root.join("bin");
+    fs::create_dir(&bin)?;
+    let wrapper = bin.join("git");
+    fs::write(&wrapper, script)?;
     fs::set_permissions(wrapper, fs::Permissions::from_mode(0o755))?;
     let real_git = String::from_utf8(git_path(&f.source)?)?;
     let path = std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(
@@ -229,7 +235,7 @@ exit "$status"
     )))?;
     let mut child = command(env!("CARGO_BIN_EXE_git-twig"), &f.source);
     child
-        .args(["new", "--detach", "../feature", "HEAD"])
+        .args(args)
         .env("PATH", path)
         .env("TWIG_TEST_REAL_GIT", real_git.trim())
         .env("TWIG_TEST_MARKER", f.root.join("marker"))
@@ -317,6 +323,64 @@ fn registration_races_never_install_unverified_or_overwrite_foreign_data() -> Re
         assert_eq!(inventory(&f.root.join("retry"))?, before);
         assert_eq!(inventory(&f.destination())?, partial);
         assert_eq!(inventory(&f.stages()?[0])?, retained);
+    }
+    Ok(())
+}
+
+#[test]
+fn revisions_moved_during_preparation_register_verified_commits_or_delegate() -> Result<()> {
+    // Move the source branch while preparation hashes staged clones. Hashing may run in
+    // parallel batches, so mkdir makes the move happen once.
+    let script = r#"#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "hash-object" ] && mkdir "$TWIG_TEST_MARKER" 2>/dev/null; then
+    "$TWIG_TEST_REAL_GIT" -C "$TWIG_TEST_SOURCE" update-ref HEAD HEAD^ || exit 94
+  fi
+done
+exec "$TWIG_TEST_REAL_GIT" "$@"
+"#;
+    for detach in [true, false] {
+        let f = Fixture::new()?;
+        #[cfg(target_os = "linux")]
+        if !linux_reflinks_available(&f)? {
+            continue;
+        }
+        git(
+            &f.source,
+            &["commit", "--allow-empty", "-m", "second commit"],
+        )?;
+        let before = inventory(&f.source)?;
+        let prepared = git(&f.source, &["rev-parse", "HEAD"])?.stdout;
+        let moved = git(&f.source, &["rev-parse", "HEAD^"])?.stdout;
+        let args: &[&str] = if detach {
+            &["new", "--detach", "../feature", "HEAD"]
+        } else {
+            &["new", "-b", "feature", "../feature", "HEAD"]
+        };
+        let output = checked(wrapped_twig(&f, script, args)?)?;
+        assert_eq!(git(&f.source, &["rev-parse", "HEAD"])?.stdout, moved);
+        let expected = if detach {
+            native(&output);
+            prepared
+        } else {
+            // A new branch keeps Git's start-point semantics, so stock Git creates it.
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("stock Git: requested revision moved"),
+                "{stderr}"
+            );
+            assert!(!stderr.contains("CoW: verified tracked files"), "{stderr}");
+            moved
+        };
+        assert_eq!(
+            git(&f.destination(), &["rev-parse", "HEAD"])?.stdout,
+            expected,
+            "detach={detach}"
+        );
+        assert!(f.stages()?.is_empty());
+        assert_eq!(registration_count(&f)?, 2);
+        clean(&f.destination())?;
+        assert_eq!(inventory(&f.source)?, before);
     }
     Ok(())
 }
