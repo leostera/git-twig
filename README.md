@@ -117,6 +117,7 @@ following these flows.
 | Linux | OpenZFS 2.2.2 (tested guest) | Synced-source `FICLONE`; dirty data may delegate | 80 checkout tests with Git 2.43; minimum-Git environment incomplete |
 | Linux | NFSv4.2 over tested XFS/ZFS server | Clone probes accepted | Full checkout suites budget-stopped; not verified support |
 | Linux | bcachefs | Exploratory; no support claim | Not verified |
+| Linux | F2FS | Stock Git fallback expected: F2FS has no reflinks | Not separately verified |
 | Windows 11 | ReFS / Dev Drive | Native block cloning (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`); each file keeps its last partial cluster private | Full test suite, native required; allocation benchmark |
 | Windows 11 | NTFS | Stock Git fallback; no savings | Full test suite |
 

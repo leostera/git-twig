@@ -25,7 +25,6 @@ describe changes from this baseline after they are implemented and verified.
 - `twig-real-bench --filesystem windows-dev-drive` measures space on fresh
   ReFS Dev Drives, counting the distinct clusters files reference, because
   ReFS volume free space moves by hundreds of MiB on its own.
-
 - Optional offline APFS compaction during adoption: `--compact` previews and
   applies verified native CoW replacements with supported target metadata and
   index contents preserved. Interactive use requires explicit saved/closed-tree
@@ -33,7 +32,6 @@ describe changes from this baseline after they are implemented and verified.
   disables sharing. Old copies are retired only after verification with a native
   busy-file guard; failures retain both copies and a recovery journal. This is
   not safe live deduplication or a measured physical-space claim.
-
 - `git twig adopt` discovers registered worktrees, previews a sibling layout and
   asks before relocating the original clone and linked checkouts. A single
   `--worktrees-dir` option selects a root; omitted roots are prompted and saved
@@ -52,7 +50,11 @@ describe changes from this baseline after they are implemented and verified.
 - Shared files are read once, not twice. The stat data of every verified file
   is recorded in the installed index, so the first `git status` in a new
   worktree no longer rehashes every file. Verification itself is unchanged
-  ([RFD0024](docs/rfds/RFD0024-verified-index-reuse.md)).
+  ([RFD0024](docs/rfds/RFD0024-verified-index-reuse.md)). Issue #9 (dsfaccini).
+- Files under automatic text detection that `git archive` certifies also have
+  their stat data recorded, so converted checkouts skip the rehash too.
+- README benchmark times include each new worktree's first `git status`, and
+  their multipliers use the same totals. Issue #8 (dsfaccini).
 - On Linux, large inventories are cloned on up to eight threads.
 - A donor with deleted tracked files, or tracked paths replaced by a symlink,
   directory or other entry, no longer disables sharing for the whole worktree.
@@ -82,11 +84,9 @@ describe changes from this baseline after they are implemented and verified.
   main checkout directly under such a folder.
 - `core.eol=native` is CRLF in Git for Windows; `text` paths are no longer left
   with LF line endings there.
-
 - Probe atomic no-overwrite directory renames before relocating any worktree.
   Drivers such as NTFS-3g that reject the primitive are refused without moving
   user data; there is no overwrite-prone ordinary-rename fallback.
-
 - Blobless partial clones no longer fetch one blob per file. Tree listings stop
   asking for blob sizes, and a target that needs blobs written by Git is left
   to stock Git, which fetches absent blobs in one batch.
