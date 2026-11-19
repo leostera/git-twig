@@ -29,7 +29,8 @@ Use git twig <command> -h for command help, even outside a repository.
 Git reserves git twig --help for the installed manual; use git twig -h
 or git-twig --help if no manual is installed.
 
-Native CoW reuses matching files from nearby worktrees on APFS or Linux reflinks.
+Native CoW reuses matching files from nearby worktrees on APFS, Linux reflinks
+or Windows ReFS and Dev Drives.
 Other requests and unsupported worktree options use stock Git. Requires Git 2.40+.
 Set TWIG_TRACE=1 to report backend selection to stderr.
 ";

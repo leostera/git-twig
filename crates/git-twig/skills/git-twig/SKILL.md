@@ -205,7 +205,8 @@ the old inode. These modes do not relocate worktrees or need agent hooks.
 - Only committed tracked files are included. Local edits and untracked/ignored
   files are excluded; tracked secrets are copied like any other tracked file.
   Install dependencies when needed.
-- Native CoW needs macOS/APFS or Linux on Btrfs or reflink-enabled XFS. Source,
+- Native CoW needs macOS/APFS, Linux on Btrfs or reflink-enabled XFS, or Windows
+  on ReFS or a Dev Drive (NTFS uses stock Git). Source,
   destination and Git metadata must share a clone-capable filesystem; this applies
   to the selected donor, not necessarily the invoking checkout. Unsupported requests use stock Git.
 - CoW shares file data, not writes. It is not a sandbox and is not always faster.
