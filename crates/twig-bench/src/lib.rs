@@ -1,5 +1,22 @@
 //! Shared subprocess boundary for owned benchmark fixtures, never user Git context.
-use std::{ffi::OsStr, path::Path, process::Command};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+/// A canonical path in the form Git and Windows tools accept: without the
+/// verbatim `\\?\` prefix `fs::canonicalize` gives on Windows.
+pub fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    let path = std::fs::canonicalize(path)?;
+    #[cfg(windows)]
+    if let Some(ordinary) = path.to_str().and_then(|text| text.strip_prefix(r"\\?\"))
+        && !ordinary.starts_with("UNC\\")
+    {
+        return Ok(PathBuf::from(ordinary));
+    }
+    Ok(path)
+}
 
 /// Keep repository redirects, injected config and trace destinations out of fixtures.
 /// Per-command private index/worktree overrides may be added by a caller afterwards.

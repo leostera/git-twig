@@ -9,6 +9,7 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use twig_bench::canonical;
 
 #[cfg(unix)]
 unsafe extern "C" {
@@ -159,9 +160,9 @@ fn run() -> Result<()> {
         ensure!(options.insert(key, value).is_none(), "duplicate option");
     }
     let required = |key: &str| options.get(key).with_context(|| format!("required {key}"));
-    let source = fs::canonicalize(required("--source")?)?;
-    let candidate = fs::canonicalize(required("--candidate")?)?;
-    let harness = fs::canonicalize(required("--harness")?)?;
+    let source = canonical(required("--source")?)?;
+    let candidate = canonical(required("--candidate")?)?;
+    let harness = canonical(required("--harness")?)?;
     let revision = required("--revision")?;
     ensure!(!revision.starts_with('-'), "invalid revision");
     let repeats = options
@@ -173,14 +174,14 @@ fn run() -> Result<()> {
     let output = PathBuf::from(required("--output")?);
     fs::create_dir_all(output.parent().context("output parent")?)?;
     fs::create_dir(&output).context("profile output must not already exist")?;
-    let output = fs::canonicalize(output)?;
+    let output = canonical(output)?;
     for name in ["bin", "git-calls", "samples", "trace2"] {
         fs::create_dir(output.join(name))?;
     }
     let project = env::current_dir()?;
     let git_path = Command::new("which").arg("git").output()?;
     ensure!(git_path.status.success(), "Git missing");
-    let git = fs::canonicalize(std::str::from_utf8(&git_path.stdout)?.trim())?;
+    let git = canonical(std::str::from_utf8(&git_path.stdout)?.trim())?;
     let exec = Command::new(&git).arg("--exec-path").output()?;
     ensure!(exec.status.success(), "Git exec-path failed");
     let exec = std::str::from_utf8(&exec.stdout)?.trim();

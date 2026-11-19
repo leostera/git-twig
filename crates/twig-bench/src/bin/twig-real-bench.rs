@@ -17,7 +17,7 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use twig_bench::command;
+use twig_bench::{canonical, command};
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -241,7 +241,7 @@ fn main() -> Result<()> {
                     !repositories.iter().any(|r: &Repository| r.label == label),
                     "duplicate repository label"
                 );
-                let path = canonical(Path::new(path))?;
+                let path = canonical(path)?;
                 let commit = git_text(&path, &["rev-parse", "HEAD"])?;
                 repositories.push(Repository {
                     label: label.into(),
@@ -1712,19 +1712,6 @@ fn remove_owned_warmup(seed: &Path, mount: &Path) -> Result<bool> {
     Ok(true)
 }
 
-/// A canonical path in the form Git and Windows tools accept: without the
-/// verbatim `\\\\?\\` prefix `fs::canonicalize` gives on Windows.
-fn canonical(path: &Path) -> Result<PathBuf> {
-    let path = fs::canonicalize(path)?;
-    #[cfg(windows)]
-    if let Some(ordinary) = path.to_str().and_then(|text| text.strip_prefix(r"\\?\"))
-        && !ordinary.starts_with("UNC\\")
-    {
-        return Ok(PathBuf::from(ordinary));
-    }
-    Ok(path)
-}
-
 fn powershell(script: &str) -> Result<String> {
     Ok(String::from_utf8(
         checked(
@@ -1849,7 +1836,7 @@ mod tests {
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
             ));
         fs::create_dir_all(&root)?;
-        let root = fs::canonicalize(root)?;
+        let root = canonical(root)?;
         let source = root.join("source");
         fs::create_dir(&source)?;
         checked(

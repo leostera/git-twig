@@ -11,7 +11,7 @@ use std::{
     thread,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-use twig_bench::command;
+use twig_bench::{canonical, command};
 
 #[derive(Clone, Serialize)]
 struct Config {
@@ -123,10 +123,10 @@ fn main() -> Result<()> {
         std::process::id()
     ));
     fs::create_dir_all(&root)?;
-    let root = fs::canonicalize(root)?;
+    let root = canonical(root)?;
     let source = root.join("source");
     fs::create_dir(&source)?;
-    let twig = fs::canonicalize(repository.join("target/release/git-twig"))
+    let twig = canonical(repository.join("target/release/git-twig"))
         .context("build cargo build --release --workspace first")?;
     let fixture = Arc::new(Fixture {
         root,

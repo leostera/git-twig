@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use twig_bench::command;
+use twig_bench::{canonical, command};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,7 +208,7 @@ fn main() -> Result<()> {
     );
     ensure!(args.next().is_none(), "unexpected extra arguments");
     fs::create_dir(&root).context("fixture root must be new")?;
-    let root = fs::canonicalize(root)?;
+    let root = canonical(root)?;
     let binaries = env::current_exe()?
         .parent()
         .context("binary directory")?
