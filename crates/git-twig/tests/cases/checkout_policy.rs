@@ -729,6 +729,38 @@ fn conditional_includes_of_identity_settings_stay_native() -> Result<()> {
 }
 
 #[test]
+fn conditional_includes_that_include_checkout_settings_delegate() -> Result<()> {
+    let f = Fixture::new()?;
+    let nested = f.root.join("nested-config");
+    fs::write(&nested, "[core]\n eol = crlf\n")?;
+    let include = f.root.join("identity-config");
+    fs::write(
+        &include,
+        format!(
+            "[user]\n name = Other\n[include]\n path = {}\n",
+            nested.to_str().unwrap().replace('\\', "/")
+        ),
+    )?;
+    git(
+        &f.source,
+        &[
+            "config",
+            "includeIf.onbranch:feature.path",
+            include.to_str().unwrap(),
+        ],
+    )?;
+    fs::write(f.source.join(".gitattributes"), "* text\n")?;
+    git(&f.source, &["add", "."])?;
+    git(&f.source, &["commit", "-m", "branch-sensitive checkout"])?;
+    let output = checked(f.add()?)?;
+    let trace = String::from_utf8_lossy(&output.stderr);
+    assert!(!trace.contains("CoW: verified"), "{trace}");
+    assert!(trace.contains("include.path require stock Git"), "{trace}");
+    assert_eq!(fs::read(f.destination().join("hello.txt"))?, CRLF);
+    Ok(())
+}
+
+#[test]
 fn relative_conditional_includes_delegate() -> Result<()> {
     let f = Fixture::new()?;
     git(

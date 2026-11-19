@@ -62,6 +62,11 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- Conditional config includes (`includeIf`) no longer force stock Git when the
+  included files set only identity, signing, remote, credential or alias
+  settings, which never change checkout bytes. Includes that set anything else,
+  include further files, or use relative paths still delegate. From issue #4
+  (mateo-m).
 - Windows: a repository on a volume mounted at a folder, rather than a drive
   letter, now clones natively. Twig asked which volume held the mount point
   itself and sent every creation to stock Git. Adoption no longer refuses a
