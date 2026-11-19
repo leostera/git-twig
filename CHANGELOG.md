@@ -15,6 +15,8 @@ describe changes from this baseline after they are implemented and verified.
 - Windows: `git twig adopt` layout moves, `--prepare` and in-place `--dedupe`
   on ReFS, holding both files locked against writers from comparison until
   sharing. Files open for writing or mapped are skipped.
+- Windows CI on NTFS and a ReFS Dev Drive with native cloning required, and
+  a Windows `.zip` in each release with its SHA-256.
 - `core.symlinks=false` repositories no longer fall back: Git writes symlink
   entries as plain files while every other file stays shared.
 

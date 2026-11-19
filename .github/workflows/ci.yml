@@ -85,6 +85,36 @@ jobs:
           TWIG_TEST_REQUIRE_NATIVE: '1'
         run: cargo test -p git-twig --locked adopt -- --include-ignored
       - run: cargo build --workspace --release --locked
+  windows:
+    # Git for Windows' defaults convert line endings; check out the bytes as
+    # committed, as on the other runners.
+    runs-on: windows-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: git --version
+      - run: cargo fmt --all --check
+      - run: cargo run -p twig-bench --bin twig-readme-table --locked -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test on NTFS, where Twig delegates to stock Git
+        run: cargo test --workspace --locked
+      - name: Create a ReFS Dev Drive
+        uses: samypr100/setup-dev-drive@v4
+        with:
+          drive-size: 4GB
+          drive-format: ReFS
+      - name: Require native block cloning on the Dev Drive
+        shell: pwsh
+        env:
+          TWIG_TEST_REQUIRE_NATIVE: '1'
+        run: |
+          $env:TWIG_TEST_FIXTURE_ROOT = "$($env:DEV_DRIVE)/twig-fixtures"
+          cargo test -p git-twig --locked
+      - run: cargo build --workspace --release --locked
   minimum-git:
     strategy:
       matrix:

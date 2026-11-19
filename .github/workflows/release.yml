@@ -16,8 +16,11 @@ jobs:
           # Keep the binary's glibc baseline compatible with supported LTS hosts.
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -25,13 +28,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: |
-          python3 scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
+      - shell: bash
+        run: |
+          python scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
           cargo test --workspace --locked
           cargo build --release --locked -p git-twig --target ${{ matrix.target }}
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        run: |
           mkdir -p package dist
           cp target/${{ matrix.target }}/release/git-twig LICENSE README.md CHANGELOG.md crates/git-twig/man/git-twig.1 package/
           tar -czf dist/git-twig-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz -C package .
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package, dist | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/git-twig.exe, LICENSE, README.md, CHANGELOG.md package/
+          Compress-Archive -Path package/* -DestinationPath "dist/git-twig-$env:GITHUB_REF_NAME-${{ matrix.target }}.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
@@ -52,7 +66,7 @@ jobs:
           merge-multiple: true
       - run: |
           python3 scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
-          (cd dist && sha256sum *.tar.gz) > dist/SHA256SUMS
+          (cd dist && sha256sum *.tar.gz *.zip) > dist/SHA256SUMS
           python3 scripts/release-formula.py "${GITHUB_REF_NAME#v}" dist > dist/git-twig.rb
           python3 scripts/release-notes.py "${GITHUB_REF_NAME#v}" > "$RUNNER_TEMP/release-notes.md"
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"

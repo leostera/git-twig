@@ -15,6 +15,8 @@ Or install from crates.io with Rust 1.95+ and Git 2.40+:
 cargo install git-twig --locked
 ```
 
+On Windows, use `cargo install` or the `.zip` attached to each release.
+
 For local development: `cargo install --path crates/git-twig --locked`.
 
 ## Use
