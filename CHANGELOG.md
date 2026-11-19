@@ -62,6 +62,8 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- macOS offline compaction no longer reports its primitives unavailable when
+  an indexer such as Spotlight briefly opens the capability probe's files.
 - SIGINT, SIGTERM or SIGHUP before registration removes this invocation's
   staging, which bulk directory clones can briefly fill with ignored files, and
   starts no stock Git fallback. Later interrupts still retain staging; SIGKILL

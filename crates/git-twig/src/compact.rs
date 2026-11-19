@@ -294,8 +294,8 @@ impl Session {
             Ok(()) => bail!("busy-unlink guard was ignored; refusing compaction"),
         }
         drop(file);
-        retire(&self.directory, c"probe-clone")?;
-        retire(&self.directory, c"probe-source")?;
+        retire_closed(&self.directory, c"probe-clone")?;
+        retire_closed(&self.directory, c"probe-source")?;
         self.record("capabilities-verified", &source, &source, 0, 0)
     }
     pub fn compact(&mut self, donor: &Path, target: &Path) -> Result<Summary> {
@@ -439,6 +439,26 @@ fn retire_original(directory: &File, name: &std::ffi::CStr, expected: Stamp) -> 
     retire(directory, name)?;
     Ok(())
 }
+/// Retire a probe file Twig has just closed. Indexers such as Spotlight open
+/// new files briefly, so the busy guard can still refuse it for a moment;
+/// that says nothing about the primitives. Real retirements never retry: a
+/// busy original keeps both versions.
+fn retire_closed(directory: &File, name: &std::ffi::CStr) -> std::io::Result<()> {
+    let mut delay = std::time::Duration::from_millis(10);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match retire(directory, name) {
+            Err(error)
+                if error.raw_os_error() == Some(libc::EBUSY)
+                    && std::time::Instant::now() < deadline =>
+            {
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(std::time::Duration::from_millis(500));
+            }
+            result => return result,
+        }
+    }
+}
 fn retire(directory: &File, name: &std::ffi::CStr) -> std::io::Result<()> {
     // SAFETY: parent descriptor is private/owned; the busy guard refuses open files.
     let result = unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), AT_NODELETEBUSY) };
@@ -446,4 +466,30 @@ fn retire(directory: &File, name: &std::ffi::CStr) -> std::io::Result<()> {
         return Err(std::io::Error::last_os_error());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closed_probe_files_are_retired_once_a_brief_opener_closes() -> Result<()> {
+        let root = std::env::temp_dir().join(format!("twig-retire-{}", std::process::id()));
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("probe"), b"probe")?;
+        let parent = File::open(&root)?;
+        // Stands in for an indexer that opens a file Twig has just closed.
+        let opener = File::open(root.join("probe"))?;
+        let busy = retire(&parent, c"probe").expect_err("open files are busy");
+        assert_eq!(busy.raw_os_error(), Some(libc::EBUSY));
+        let closer = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            drop(opener);
+        });
+        retire_closed(&parent, c"probe")?;
+        closer.join().expect("closer panicked");
+        assert!(!root.join("probe").exists());
+        fs::remove_dir(&root)?;
+        Ok(())
+    }
 }
