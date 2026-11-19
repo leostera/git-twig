@@ -64,14 +64,14 @@ pub fn materialize(
         }
         match node {
             Node::Directory(directory) => {
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", windows))]
                 {
                     let mut files = Vec::new();
                     plan_tracked_directory(&source, &target, directory, &mut files)?;
                     clone_planned_files(&files, modes)?;
-                    continue; // The Linux walker already establishes types and checkout modes.
+                    continue; // The file walker already establishes types and checkout modes.
                 }
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(not(any(target_os = "linux", windows)))]
                 {
                     native::clone_path(&source, &target)?;
                     let _ = directory;
@@ -99,7 +99,7 @@ pub fn materialize(
 
 // Linux FICLONE works on regular files, not directory trees. Walk only the
 // committed inventory so ignored files and unrelated special files are never opened.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 struct PlannedFile {
     source: std::path::PathBuf,
     target: std::path::PathBuf,
@@ -108,7 +108,7 @@ struct PlannedFile {
 
 /// Create the tracked directories and symlinks, and list the regular files to
 /// clone. Directories exist before any file worker starts.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 fn plan_tracked_directory(
     source: &Path,
     target: &Path,
@@ -145,7 +145,7 @@ fn plan_tracked_directory(
 
 /// Reflink each planned file. One clone is a handful of system calls with no
 /// shared state, so a large inventory is split across a few threads.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Result<()> {
     let clone = |file: &PlannedFile| -> Result<()> {
         let kind = Node::File {
@@ -184,7 +184,7 @@ fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Resu
     })
 }
 
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(target_os = "linux", windows, test))]
 fn clone_worker_count(files: usize, cpus: usize) -> usize {
     if files >= 1024 { cpus.clamp(1, 8) } else { 1 }
 }

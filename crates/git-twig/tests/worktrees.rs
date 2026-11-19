@@ -72,7 +72,7 @@ impl Fixture {
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&root)?;
-        let root = fs::canonicalize(root)?;
+        let root = canonical(&root)?;
         let source = root.join("source");
         fs::create_dir(&source)?;
         checked(
@@ -183,6 +183,19 @@ fn bounded_output(mut command: Command) -> Result<Output> {
     Ok(result?)
 }
 
+/// A canonical path in the form Git accepts: Windows' verbatim `\\?\C:\`
+/// prefix is not understood by Git for Windows.
+fn canonical(path: &Path) -> Result<PathBuf> {
+    let path = fs::canonicalize(path)?;
+    #[cfg(windows)]
+    if let Some(ordinary) = path.to_str().and_then(|text| text.strip_prefix(r"\\?\"))
+        && !ordinary.starts_with("UNC\\")
+    {
+        return Ok(PathBuf::from(ordinary));
+    }
+    Ok(path)
+}
+
 fn checked(output: Output) -> Result<Output> {
     ensure!(
         output.status.success(),
@@ -214,6 +227,55 @@ fn native(output: &Output) {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+}
+
+/// Whether the fixture filesystem can clone, so a test of native behavior has
+/// something to observe. Native-required runs must be able to.
+fn cow_available(f: &Fixture) -> Result<bool> {
+    #[cfg(target_os = "linux")]
+    return linux_reflinks_available(f);
+    #[cfg(windows)]
+    return windows_block_cloning_available(f);
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        let _ = f;
+        Ok(cfg!(target_os = "macos"))
+    }
+}
+
+/// Ask the volume directly, not Twig, so a broken backend cannot pass for an
+/// unsupported filesystem.
+#[cfg(windows)]
+fn windows_block_cloning_available(f: &Fixture) -> Result<bool> {
+    use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+    use windows_sys::Win32::{
+        Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, GetVolumeInformationByHandleW},
+        System::SystemServices::FILE_SUPPORTS_BLOCK_REFCOUNTING,
+    };
+    let directory = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(&f.root)?;
+    let mut flags = 0;
+    // SAFETY: a live handle; zero-length name buffers are never written.
+    let result = unsafe {
+        GetVolumeInformationByHandleW(
+            directory.as_raw_handle(),
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut flags,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    ensure!(result != 0, "{}", std::io::Error::last_os_error());
+    let supported = flags & FILE_SUPPORTS_BLOCK_REFCOUNTING != 0;
+    if std::env::var_os("TWIG_TEST_REQUIRE_NATIVE").is_some() {
+        ensure!(supported, "test volume must support block cloning");
+    }
+    Ok(supported)
 }
 
 #[cfg(target_os = "linux")]
@@ -263,24 +325,59 @@ fn linux_selects_reflinks_or_delegates_on_unsupported_filesystems() -> Result<()
     Ok(())
 }
 
-#[cfg(unix)]
+/// Commit a symlink entry without creating one, so the test runs where the
+/// fixture cannot create symlinks.
+fn commit_symlink(f: &Fixture, path: &str, target: &str) -> Result<()> {
+    let blob = command("git", &f.source)
+        .args(["hash-object", "-w", "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            child
+                .stdin
+                .take()
+                .expect("stdin")
+                .write_all(target.as_bytes())?;
+            child.wait_with_output()
+        })?;
+    let blob = String::from_utf8(checked(blob)?.stdout)?;
+    git(
+        &f.source,
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("120000,{},{path}", blob.trim()),
+        ],
+    )?;
+    git(&f.source, &["commit", "-m", "link"])?;
+    Ok(())
+}
+
 #[test]
-fn disabled_symlinks_delegate_for_root_and_nested_entries() -> Result<()> {
+fn disabled_symlinks_are_git_written_files_beside_shared_bytes() -> Result<()> {
     let f = Fixture::new()?;
-    fs::create_dir(f.source.join("tree"))?;
-    for name in ["link", "tree/link"] {
-        std::os::unix::fs::symlink("missing", f.source.join(name))?;
-    }
-    git(&f.source, &["add", "."])?;
-    git(&f.source, &["commit", "-m", "links"])?;
     git(&f.source, &["config", "core.symlinks", "false"])?;
+    fs::create_dir(f.source.join("tree"))?;
+    fs::write(f.source.join("tree/file"), "shared\n")?;
+    git(&f.source, &["add", "."])?;
+    for name in ["link", "tree/link"] {
+        commit_symlink(&f, name, "missing")?;
+    }
+    git(&f.source, &["checkout", "--", "."])?;
     let output = checked(f.add()?)?;
-    assert!(!String::from_utf8_lossy(&output.stderr).contains("CoW: verified"));
+    native(&output);
+    let trace = String::from_utf8_lossy(&output.stderr);
+    if cow_available(&f)? {
+        assert!(trace.contains("2 Git-written paths"), "{trace}");
+    }
     for name in ["link", "tree/link"] {
         assert!(fs::symlink_metadata(f.destination().join(name))?.is_file());
         assert_eq!(fs::read(f.destination().join(name))?, b"missing");
-        assert!(fs::symlink_metadata(f.source.join(name))?.is_symlink());
     }
+    assert_eq!(fs::read(f.destination().join("tree/file"))?, b"shared\n");
     clean(&f.destination())
 }
 
@@ -301,8 +398,14 @@ fn legacy_crlf_attributes_cannot_hide_dirty_raw_bytes() -> Result<()> {
         }
         let output = checked(f.add()?)?;
         native(&output);
+        // `crlf` means text; the native line ending is CRLF in Git for Windows.
+        let expected: &[u8] = if cfg!(windows) && attribute == "crlf" {
+            b"hello\r\n"
+        } else {
+            b"hello\n"
+        };
         for name in ["hello.txt", "tree/file.txt"] {
-            assert_eq!(fs::read(f.destination().join(name))?, b"hello\n");
+            assert_eq!(fs::read(f.destination().join(name))?, expected);
             assert_eq!(fs::read(f.source.join(name))?, b"hello\r\n");
         }
         clean(&f.destination())?;
@@ -616,6 +719,9 @@ fn git_c_main_layout_creates_a_sibling_from_head() -> Result<()> {
 #[test]
 fn linked_source_retains_failed_staging_in_the_common_git_directory() -> Result<()> {
     let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(()); // Nothing is staged where Twig delegates up front.
+    }
     checked(f.add()?)?;
     // A refusal only Git's registration discovers: `main` blocks `main/nested`.
     let output = twig(

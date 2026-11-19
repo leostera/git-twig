@@ -4,7 +4,7 @@ use anyhow::{Context, Result, ensure};
 use serde::Serialize;
 use std::{
     env,
-    ffi::{CString, OsString},
+    ffi::OsString,
     fs::{self, OpenOptions},
     io::{Seek, SeekFrom, Write},
     path::{Path, PathBuf},
@@ -1122,8 +1122,168 @@ fn create(
     }
 }
 
+/// Platform primitives for measurement. Windows has no executable bit, and Git
+/// for Windows writes paths as UTF-8 and may write symlinks as plain files.
+mod platform {
+    use anyhow::{Result, ensure};
+    use std::{ffi::OsString, fs::Metadata, path::Path};
+
+    #[cfg(unix)]
+    pub fn os_string(bytes: Vec<u8>) -> Result<OsString> {
+        use std::os::unix::ffi::OsStringExt;
+        Ok(OsString::from_vec(bytes))
+    }
+    #[cfg(windows)]
+    pub fn os_string(bytes: Vec<u8>) -> Result<OsString> {
+        Ok(String::from_utf8(bytes)?.into())
+    }
+
+    #[cfg(unix)]
+    pub fn bytes(path: &Path) -> Result<Vec<u8>> {
+        use std::os::unix::ffi::OsStrExt;
+        Ok(path.as_os_str().as_bytes().to_vec())
+    }
+    #[cfg(windows)]
+    pub fn bytes(path: &Path) -> Result<Vec<u8>> {
+        Ok(path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("path is not Unicode: {path:?}"))?
+            .replace('\\', "/")
+            .into_bytes())
+    }
+
+    /// The executable bit, where the platform has one.
+    pub fn executable(metadata: &Metadata) -> Option<bool> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            Some(metadata.permissions().mode() & 0o100 != 0)
+        }
+        #[cfg(windows)]
+        {
+            let _ = metadata;
+            None
+        }
+    }
+
+    /// A tracked symlink's target as checked out: a link, or a plain file
+    /// holding the target where Git does not create symlinks.
+    pub fn symlink_target(path: &Path, metadata: &Metadata) -> Result<Vec<u8>> {
+        if metadata.file_type().is_symlink() {
+            return bytes(&std::fs::read_link(path)?);
+        }
+        ensure!(cfg!(windows) && metadata.is_file(), "symlink changed type");
+        Ok(std::fs::read(path)?)
+    }
+
+    #[cfg(unix)]
+    pub fn self_cpu_ms() -> Result<f64> {
+        let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();
+        // SAFETY: usage points to writable rusage storage; RUSAGE_SELF excludes CLI children.
+        ensure!(
+            unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) } == 0,
+            "getrusage failed: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: successful getrusage initialized usage.
+        let usage = unsafe { usage.assume_init() };
+        Ok(
+            (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) as f64 * 1000.0
+                + (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) as f64 / 1000.0,
+        )
+    }
+    #[cfg(windows)]
+    pub fn self_cpu_ms() -> Result<f64> {
+        use windows_sys::Win32::{
+            Foundation::FILETIME,
+            System::Threading::{GetCurrentProcess, GetProcessTimes},
+        };
+        let zero = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let (mut created, mut exited, mut kernel, mut user) = (zero, zero, zero, zero);
+        // SAFETY: the pseudo-handle is always valid; all outputs are writable.
+        let result = unsafe {
+            GetProcessTimes(
+                GetCurrentProcess(),
+                &mut created,
+                &mut exited,
+                &mut kernel,
+                &mut user,
+            )
+        };
+        ensure!(
+            result != 0,
+            "GetProcessTimes failed: {}",
+            std::io::Error::last_os_error()
+        );
+        let ticks = |time: FILETIME| {
+            (u64::from(time.dwHighDateTime) << 32 | u64::from(time.dwLowDateTime)) as f64
+        };
+        // FILETIME counts 100 ns intervals.
+        Ok((ticks(kernel) + ticks(user)) / 10_000.0)
+    }
+
+    /// Allocated and total bytes of the filesystem holding `mount`.
+    // libc block counters are u32 on Darwin and u64 on Linux.
+    #[cfg(unix)]
+    #[allow(clippy::unnecessary_cast)]
+    pub fn space(mount: &Path) -> Result<(u64, u64)> {
+        use std::os::unix::ffi::OsStrExt;
+        let path = std::ffi::CString::new(mount.as_os_str().as_bytes())?;
+        let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+        // SAFETY: path is a live C string; stat points to writable storage of the required size.
+        ensure!(
+            unsafe { libc::statvfs(path.as_ptr(), stat.as_mut_ptr()) } == 0,
+            "statvfs failed: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: successful statvfs initialized the complete result.
+        let stat = unsafe { stat.assume_init() };
+        let block_size = stat.f_frsize;
+        Ok((
+            (stat.f_blocks as u64 - stat.f_bfree as u64) * block_size,
+            stat.f_blocks as u64 * block_size,
+        ))
+    }
+    #[cfg(windows)]
+    pub fn space(mount: &Path) -> Result<(u64, u64)> {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+        let path: Vec<u16> = mount.as_os_str().encode_wide().chain([0]).collect();
+        let (mut available, mut total, mut free) = (0, 0, 0);
+        // SAFETY: path is NUL-terminated UTF-16; all outputs are writable.
+        let result =
+            unsafe { GetDiskFreeSpaceExW(path.as_ptr(), &mut available, &mut total, &mut free) };
+        ensure!(
+            result != 0,
+            "GetDiskFreeSpaceExW failed: {}",
+            std::io::Error::last_os_error()
+        );
+        Ok((total - free, total))
+    }
+
+    /// Flush the measured filesystem before sampling its allocation.
+    pub fn sync(mount: &Path) -> Result<()> {
+        #[cfg(unix)]
+        {
+            let mut sync = std::process::Command::new("sync");
+            #[cfg(target_os = "linux")]
+            sync.arg("-f").arg(mount); // syncfs: never flush unrelated host filesystems.
+            #[cfg(not(target_os = "linux"))]
+            let _ = mount;
+            ensure!(sync.status()?.success(), "sync failed");
+        }
+        // Flushing a whole volume needs administrator rights on Windows. ReFS
+        // reports allocation as it happens; the settle loop still waits.
+        #[cfg(windows)]
+        let _ = mount;
+        Ok(())
+    }
+}
+
 fn expected_files(seed: &Path) -> Result<Vec<Expected>> {
-    use std::os::unix::{ffi::OsStringExt, fs::PermissionsExt};
     let listing = checked(
         command("git", seed)
             .args(["ls-files", "--stage", "-z"])
@@ -1137,20 +1297,16 @@ fn expected_files(seed: &Path) -> Result<Vec<Expected>> {
         let object = header.next().context("missing index object")?;
         ensure!((object.len() == 40 || object.len() == 64) && object.bytes().all(|b| b.is_ascii_hexdigit()), "invalid index object");
         ensure!(header.next() == Some("0") && header.next().is_none(), "unmerged or malformed index");
-        let path = PathBuf::from(OsString::from_vec(record[tab + 1..].to_vec()));
+        let path = PathBuf::from(platform::os_string(record[tab + 1..].to_vec())?);
         ensure!(!path.as_os_str().is_empty() && path.components().all(|part| matches!(part, std::path::Component::Normal(name) if !name.eq_ignore_ascii_case(".git"))), "unsafe benchmark path");
         let absolute = seed.join(&path);
         let metadata = fs::symlink_metadata(&absolute)?;
         let contents = match mode {
             "100644" | "100755" => {
                 ensure!(metadata.is_file(), "expected regular file");
-                Contents::File { data: fs::read(&absolute)?, executable: metadata.permissions().mode() & 0o100 != 0 }
+                Contents::File { data: fs::read(&absolute)?, executable: mode == "100755" }
             }
-            "120000" => {
-                use std::os::unix::ffi::OsStrExt;
-                ensure!(metadata.file_type().is_symlink(), "expected symlink");
-                Contents::Symlink(fs::read_link(&absolute)?.as_os_str().as_bytes().to_vec())
-            }
+            "120000" => Contents::Symlink(platform::symlink_target(&absolute, &metadata)?),
             "160000" => {
                 ensure!(metadata.is_dir() && fs::read_dir(&absolute)?.next().is_none(), "expected uninitialized gitlink directory");
                 Contents::GitlinkDirectory
@@ -1161,7 +1317,6 @@ fn expected_files(seed: &Path) -> Result<Vec<Expected>> {
     }).collect()
 }
 fn verify_file(root: &Path, entry: &Expected) -> Result<()> {
-    use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
     let absolute = root.join(&entry.path);
     let metadata = fs::symlink_metadata(&absolute)?;
     match &entry.contents {
@@ -1169,14 +1324,13 @@ fn verify_file(root: &Path, entry: &Expected) -> Result<()> {
             ensure!(metadata.is_file(), "regular file changed type");
             ensure!(fs::read(absolute)? == *data, "file bytes differ");
             ensure!(
-                (metadata.permissions().mode() & 0o100 != 0) == *executable,
+                platform::executable(&metadata).is_none_or(|actual| actual == *executable),
                 "executable bit differs"
             );
         }
         Contents::Symlink(target) => {
-            ensure!(metadata.file_type().is_symlink(), "symlink changed type");
             ensure!(
-                fs::read_link(absolute)?.as_os_str().as_bytes() == target,
+                platform::symlink_target(&absolute, &metadata)? == *target,
                 "symlink differs"
             );
         }
@@ -1190,19 +1344,7 @@ fn verify_file(root: &Path, entry: &Expected) -> Result<()> {
     Ok(())
 }
 fn self_cpu_ms() -> Result<f64> {
-    let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();
-    // SAFETY: usage points to writable rusage storage; RUSAGE_SELF excludes CLI children.
-    ensure!(
-        unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) } == 0,
-        "getrusage failed: {}",
-        std::io::Error::last_os_error()
-    );
-    // SAFETY: successful getrusage initialized usage.
-    let usage = unsafe { usage.assume_init() };
-    Ok(
-        (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) as f64 * 1000.0
-            + (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) as f64 / 1000.0,
-    )
+    platform::self_cpu_ms()
 }
 
 #[derive(Serialize)]
@@ -1228,10 +1370,7 @@ fn allocation_has_settled(observations: &[u64]) -> bool {
 }
 
 fn settled_space(mount: &Path) -> Result<Space> {
-    let mut sync = Command::new("sync");
-    #[cfg(target_os = "linux")]
-    sync.arg("-f").arg(mount); // syncfs: never flush unrelated host filesystems.
-    checked(sync.output()?)?;
+    platform::sync(mount)?;
     let mut observations = vec![];
     let mut snapshot = space(mount)?;
     // Allocation accounting may continue after sync; require a long quiet window.
@@ -1247,24 +1386,11 @@ fn settled_space(mount: &Path) -> Result<Space> {
     snapshot.observed_allocated_bytes = observations;
     Ok(snapshot)
 }
-// libc block counters are u32 on Darwin and u64 on Linux.
-#[allow(clippy::unnecessary_cast)]
 fn space(mount: &Path) -> Result<Space> {
-    use std::os::unix::ffi::OsStrExt;
-    let path = CString::new(mount.as_os_str().as_bytes())?;
-    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
-    // SAFETY: path is a live C string; stat points to writable storage of the required size.
-    ensure!(
-        unsafe { libc::statvfs(path.as_ptr(), stat.as_mut_ptr()) } == 0,
-        "statvfs failed: {}",
-        std::io::Error::last_os_error()
-    );
-    // SAFETY: successful statvfs initialized the complete result.
-    let stat = unsafe { stat.assume_init() };
-    let block_size = stat.f_frsize;
+    let (allocated_bytes, total_bytes) = platform::space(mount)?;
     Ok(Space {
-        allocated_bytes: (stat.f_blocks as u64 - stat.f_bfree as u64) * block_size,
-        total_bytes: stat.f_blocks as u64 * block_size,
+        allocated_bytes,
+        total_bytes,
         stable: false,
         observed_allocated_bytes: vec![],
     })

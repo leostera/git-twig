@@ -74,7 +74,7 @@ fn one<T>(slot: &mut Option<T>, value: T) -> Result<()> {
 impl Record {
     fn field(&mut self, field: &[u8]) -> Result<()> {
         if let Some(value) = field.strip_prefix(b"worktree ") {
-            let path = PathBuf::from(crate::native::os_string(value.to_vec()));
+            let path = crate::native::git_path(value.to_vec());
             ensure!(path.is_absolute(), "registration path must be absolute");
             one(&mut self.path, path)?;
         } else if let Some(value) = field.strip_prefix(b"HEAD ") {
@@ -160,8 +160,9 @@ mod tests {
     #[test]
     fn inventory_preserves_states_reasons_and_future_fields() -> Result<()> {
         let head = "a".repeat(40);
+        let d = if cfg!(windows) { "C:" } else { "" };
         let raw = format!(
-            "worktree /root\0HEAD {head}\0branch refs/heads/main\0\0worktree /peer\0HEAD {head}\0detached\0locked reason\nline\0prunable missing\0future opaque\0\0worktree /bare\0bare\0\0"
+            "worktree {d}/root\0HEAD {head}\0branch refs/heads/main\0\0worktree {d}/peer\0HEAD {head}\0detached\0locked reason\nline\0prunable missing\0future opaque\0\0worktree {d}/bare\0bare\0\0"
         );
         let records = parse(raw.as_bytes())?;
         assert_eq!(records.len(), 3);

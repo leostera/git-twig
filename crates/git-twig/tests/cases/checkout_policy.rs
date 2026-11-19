@@ -1,5 +1,6 @@
 //! Differential checkout tests: stock Git's raw working tree is the oracle.
 use super::*;
+#[cfg_attr(not(unix), allow(unused_imports))]
 use std::io::{Read, Write};
 
 const LF: &[u8] = b"hello\n";
@@ -590,7 +591,10 @@ fn failing_filters_run_once_through_stock_git_and_retain_failure() -> Result<()>
     assert!(!String::from_utf8_lossy(&output.stderr).contains("CoW: verified"));
     assert_eq!(fs::read_to_string(marker)?, "call\n");
     assert_eq!(fs::read(f.source.join("hello.txt"))?, LF);
-    assert!(!f.stages()?.is_empty());
+    // Staging exists only where Twig got as far as preparing one.
+    if cow_available(&f)? {
+        assert!(!f.stages()?.is_empty());
+    }
     Ok(())
 }
 

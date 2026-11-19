@@ -26,6 +26,12 @@ impl Staging {
                 "Git metadata and destination are on different filesystems"
             );
         }
+        #[cfg(windows)]
+        anyhow::ensure!(
+            crate::windows::volume_identity(&parent)?
+                == crate::windows::volume_identity(destination_parent)?,
+            "Git metadata and destination are on different volumes"
+        );
         let container = create_private(&parent)?;
         self.container = Some(container.clone());
         crate::trace(&format!(
@@ -78,7 +84,9 @@ fn create_private(parent: &Path) -> Result<PathBuf> {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
+        #[cfg_attr(not(unix), allow(unused_mut))]
         let mut builder = fs::DirBuilder::new();
+        // Windows directories inherit the ACL of the Git directory they live in.
         #[cfg(unix)]
         {
             use std::os::unix::fs::DirBuilderExt;

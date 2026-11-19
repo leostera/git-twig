@@ -1,5 +1,5 @@
 use anyhow::Result;
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 use anyhow::bail;
 use std::{ffi::OsString, path::Path};
 
@@ -50,9 +50,22 @@ pub fn clone_path(source: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(windows)]
+pub fn clone_path(source: &Path, destination: &Path) -> Result<()> {
+    crate::windows::clone_file(source, destination)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 pub fn clone_path(_: &Path, _: &Path) -> Result<()> {
-    bail!("native cloning requires macOS or Linux")
+    bail!("native cloning requires macOS, Linux or Windows")
+}
+
+/// A canonical path Git accepts. On Windows, not the verbatim `\\?\` form.
+pub fn canonicalize(path: &Path) -> Result<std::path::PathBuf> {
+    #[cfg(windows)]
+    return crate::windows::canonicalize(path);
+    #[cfg(not(windows))]
+    Ok(std::fs::canonicalize(path)?)
 }
 
 /// clonefile(2) copies BSD flags and extended attributes along with the bytes.
@@ -127,7 +140,12 @@ fn clear_flags(path: &Path, metadata: &std::fs::Metadata) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+pub fn clear_user_flags(path: &Path) -> Result<()> {
+    crate::windows::clear_readonly(path)
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 pub fn clear_user_flags(_: &Path) -> Result<()> {
     Ok(())
 }
@@ -167,13 +185,16 @@ impl FileModes {
                 return Ok(());
             }
         }
+        // Windows keeps only a read-only attribute, and new clones never have it.
         #[cfg(not(unix))]
-        let _ = current;
+        if current.permissions().readonly() == wanted.readonly() {
+            return Ok(());
+        }
         std::fs::set_permissions(path, wanted.clone())?;
         Ok(())
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     pub fn apply(&self, path: &Path, executable: bool) -> Result<()> {
         let permissions = if executable {
             &self.executable
@@ -207,7 +228,7 @@ pub fn symlink(source: &Path, destination: &Path) -> Result<()> {
     #[cfg(not(unix))]
     {
         let _ = (source, destination);
-        bail!("symlinks require Unix")
+        anyhow::bail!("symlinks require Unix")
     }
 }
 
@@ -221,6 +242,17 @@ pub fn path_bytes(path: &Path) -> Vec<u8> {
     {
         path.to_string_lossy().as_bytes().to_vec()
     }
+}
+
+/// A path Git printed. Git for Windows prints `C:/a/b`; show it as `C:\\a\\b`,
+/// which names the same file, so messages and Git's own output agree.
+pub fn git_path(bytes: Vec<u8>) -> std::path::PathBuf {
+    #[cfg(windows)]
+    let bytes: Vec<u8> = bytes
+        .into_iter()
+        .map(|byte| if byte == b'/' { b'\\' } else { byte })
+        .collect();
+    std::path::PathBuf::from(os_string(bytes))
 }
 
 pub fn os_string(bytes: Vec<u8>) -> OsString {

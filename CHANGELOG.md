@@ -8,6 +8,13 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Added
 
+- Windows: native copy-on-write on ReFS and Dev Drive volumes through block
+  cloning, with every shared byte verified as on macOS and Linux. NTFS volumes
+  delegate to stock Git after one volume query. Builds on issue #4 (mateo-m)
+  and PR #3 (InventingMaya). See RFD0027.
+- `core.symlinks=false` repositories no longer fall back: Git writes symlink
+  entries as plain files while every other file stays shared.
+
 - Optional offline APFS compaction during adoption: `--compact` previews and
   applies verified native CoW replacements with supported target metadata and
   index contents preserved. Interactive use requires explicit saved/closed-tree
@@ -43,6 +50,9 @@ describe changes from this baseline after they are implemented and verified.
   permissions.
 
 ### Fixed
+
+- `core.eol=native` is CRLF in Git for Windows; `text` paths are no longer left
+  with LF line endings there.
 
 - Probe atomic no-overwrite directory renames before relocating any worktree.
   Drivers such as NTFS-3g that reject the primitive are refused without moving

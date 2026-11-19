@@ -1,4 +1,7 @@
 //! Native CoW materialization with Git-owned linked-worktree bookkeeping.
+// Adoption and existing-worktree sharing are Unix-only for now; on Windows their
+// commands refuse with a reason, and their helpers go unused.
+#[cfg_attr(not(unix), allow(dead_code, unused_imports))]
 mod adopt;
 mod checkout;
 #[cfg(target_os = "macos")]
@@ -9,11 +12,15 @@ mod file_bytes;
 mod index;
 mod native;
 mod objects;
+#[cfg_attr(not(unix), allow(dead_code))]
 mod registry;
+#[cfg_attr(not(unix), allow(dead_code))]
 mod sharing;
 mod snapshot;
 mod staging;
 mod tree;
+#[cfg(windows)]
+mod windows;
 
 use anyhow::{Context, Result, ensure};
 use std::{
@@ -133,8 +140,8 @@ struct Prepared {
 fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> Result<Prepared> {
     let started = std::time::Instant::now();
     ensure!(
-        cfg!(any(target_os = "macos", target_os = "linux")),
-        "native CoW is supported only on macOS and Linux"
+        cfg!(any(target_os = "macos", target_os = "linux", windows)),
+        "native CoW is supported only on macOS, Linux and Windows"
     );
     for key in [
         "GIT_DIR",
@@ -183,7 +190,7 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
         parent.is_dir(),
         "destination parent does not exist: {parent:?}"
     );
-    let parent = fs::canonicalize(parent)?;
+    let parent = native::canonicalize(parent)?;
     let destination = parent.join(destination.file_name().context("destination has no name")?);
     objects::ensure_literal_objects(&root)?;
     checkout::ensure_relocatable_worktree_config(&root)?;
@@ -194,16 +201,6 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
     let entries = tree::parse(
         &checked(git(&root).args(["ls-tree", listing, "--full-tree", &commit]))?.stdout,
     )?;
-    // These semantics are owned by Git, not by the CoW materializer.
-    if entries.iter().any(|entry| entry.kind == Kind::Symlink)
-        && git(&root)
-            .args(["config", "--bool", "--get", "core.symlinks"])
-            .output()?
-            .stdout
-            == b"false\n"
-    {
-        anyhow::bail!("core.symlinks=false requires stock Git");
-    }
     // Reference/index hooks run while Git registers or initializes the worktree.
     // They may themselves call Twig: never hold our registrar lock across them.
     let hook = output_path(checked(git(&root).args(["rev-parse", "--git-path", "hooks"]))?.stdout)?;
@@ -221,6 +218,8 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
             "{event} hook requires stock Git to avoid reentrant registration locks"
         );
     }
+    #[cfg(windows)]
+    windows::ensure_block_cloning(&parent)?;
     let stage = staging.create(&root, &parent)?;
     let data = stage.join("data");
     fs::create_dir(&data)?;
@@ -231,10 +230,13 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
     let modes = native::FileModes::new(&stage)?;
     // Listing peer Git metadata must share the registrar lock: another Twig may
     // otherwise be between creating its worktree directory and writing commondir.
-    let donor = {
+    let mut donor = {
         let _registration_lock = lock_registration(&root)?;
         donor::choose(&root, &parent, &entries)?
     };
+    if !policy.native_symlinks {
+        donor.candidates.retain(|entry| entry.kind != Kind::Symlink);
+    }
     trace(&format!(
         "donor: {:?}, {} matching target paths",
         donor.root,
@@ -289,6 +291,8 @@ fn install(cwd: &Path, args: &[OsString], prepared: Prepared) -> Result<i32> {
     trace("APFS CoW: verified tracked files");
     #[cfg(target_os = "linux")]
     trace("Linux reflink CoW: verified tracked files");
+    #[cfg(windows)]
+    trace("Windows block clone CoW: verified tracked files");
     // Git enumerates peer worktree metadata while registering. Serialize Twig registrars
     // so none observes a peer between mkdir and writing commondir/HEAD.
     let registration_lock = lock_registration(&prepared.root)?;
@@ -460,7 +464,7 @@ fn output_path(mut bytes: Vec<u8>) -> Result<PathBuf> {
     if bytes.last() == Some(&b'\n') {
         bytes.pop();
     }
-    Ok(PathBuf::from(native::os_string(bytes)))
+    Ok(native::git_path(bytes))
 }
 
 #[cfg(test)]

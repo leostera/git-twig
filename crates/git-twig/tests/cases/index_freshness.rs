@@ -3,6 +3,7 @@
 use super::*;
 
 /// Stat fields Git recorded for one path, from `ls-files --debug`.
+#[cfg_attr(not(unix), allow(dead_code))]
 fn recorded(checkout: &Path, name: &str) -> Result<(u64, u64)> {
     let listing = String::from_utf8(git(checkout, &["ls-files", "--debug", "--", name])?.stdout)?;
     let field = |key: &str| -> Result<u64> {

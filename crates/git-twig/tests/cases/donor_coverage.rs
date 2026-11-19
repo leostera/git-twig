@@ -1,5 +1,15 @@
 //! Raw checkout parity, with an independent Git oracle that cannot become our donor.
 use super::*;
+
+// Windows names cannot hold control characters.
+#[cfg(unix)]
+const UNUSUAL_NAME: &str = " added\tname\n";
+#[cfg(windows)]
+const UNUSUAL_NAME: &str = " added name ü";
+#[cfg(unix)]
+const NEAR_DONOR: &str = "near\n donor";
+#[cfg(windows)]
+const NEAR_DONOR: &str = "near donor ü";
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -194,7 +204,7 @@ fn revisions_added_paths_and_dirty_staged_donors_match_stock_git() -> Result<()>
                         fs::Permissions::from_mode(0o755),
                     )?;
                 }
-                fs::write(f.source.join(" added\tname\n"), "target-only root\n")?;
+                fs::write(f.source.join(UNUSUAL_NAME), "target-only root\n")?;
                 fs::write(
                     f.source.join(".gitattributes"),
                     "* text=auto eol=lf\nhello.txt text eol=crlf\n",
@@ -286,6 +296,9 @@ fn remote_tracking_configuration_is_not_a_checkout_policy_change() -> Result<()>
 #[test]
 fn no_shared_target_paths_delegate_explicitly() -> Result<()> {
     let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(()); // Twig delegates before looking for a donor.
+    }
     let old = String::from_utf8(git(&f.source, &["rev-parse", "HEAD"])?.stdout)?;
     git(&f.source, &["rm", "-r", "."])?;
     fs::write(f.source.join("target-only"), "new tree\n")?;
@@ -316,13 +329,19 @@ fn chooses_a_better_linked_donor_without_trusting_its_dirty_bytes() -> Result<()
     let first = String::from_utf8(git(&f.source, &["rev-parse", "HEAD"])?.stdout)?;
     git(
         &f.source,
-        &["worktree", "add", "--detach", "../near\n donor", "HEAD"],
+        &[
+            "worktree",
+            "add",
+            "--detach",
+            &format!("../{NEAR_DONOR}"),
+            "HEAD",
+        ],
     )?;
     for name in ["a", "b", "c"] {
         fs::write(f.source.join(name), "second\n")?;
     }
     git(&f.source, &["commit", "-am", "current B"])?;
-    let near = f.root.join("near\n donor");
+    let near = f.root.join(NEAR_DONOR);
     fs::write(near.join("a"), "dirty linked donor\n")?;
     let index_path = String::from_utf8(
         git(

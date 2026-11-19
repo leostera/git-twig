@@ -79,27 +79,27 @@ impl<'a> Checkout<'a> {
         command
             .env("GIT_DIR", &self.git_dir)
             .env("GIT_WORK_TREE", self.data)
-            .env("GIT_INDEX_FILE", self.index)
-            .args([
-                "-c",
-                "core.fsmonitor=false",
-                "-c",
-                "core.sparseCheckout=false",
-                "-c",
-                "core.filemode=true",
-                "-c",
-                "core.symlinks=true",
-                "-c",
-                "submodule.recurse=false",
-                // The staged index is installed into the new worktree: it must be
-                // one self-contained file with nothing tied to this location.
-                "-c",
-                "core.splitIndex=false",
-                "-c",
-                "core.untrackedCache=false",
-                "-c",
-                "index.sparse=false",
-            ]);
+            .env("GIT_INDEX_FILE", self.index);
+        // Native clones carry executable bits on Unix. Windows has none, and Git
+        // for Windows records core.filemode=false for that reason.
+        #[cfg(unix)]
+        command.args(["-c", "core.filemode=true"]);
+        command.args([
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.sparseCheckout=false",
+            "-c",
+            "submodule.recurse=false",
+            // The staged index is installed into the new worktree: it must be
+            // one self-contained file with nothing tied to this location.
+            "-c",
+            "core.splitIndex=false",
+            "-c",
+            "core.untrackedCache=false",
+            "-c",
+            "index.sparse=false",
+        ]);
         command
     }
 
@@ -123,6 +123,7 @@ impl<'a> Checkout<'a> {
             config: checkout_config(&config),
             attributes,
             actions,
+            native_symlinks: configuration.native_symlinks(),
         })
     }
 
@@ -277,6 +278,10 @@ pub struct Policy {
     config: Vec<u8>,
     attributes: Vec<u8>,
     actions: Vec<Action>,
+    /// Whether Twig recreates symlinks itself. Otherwise Git writes each one:
+    /// as a plain file holding the target under core.symlinks=false, and as a
+    /// file or directory symlink of Git's choosing on Windows.
+    pub native_symlinks: bool,
 }
 
 impl Policy {
@@ -357,7 +362,13 @@ fn parse_attributes(
                 Action::GitWrite
             } else if matches!(entry.kind, Kind::File { .. }) && attrs.unconverted(configuration) {
                 Action::VerifySettled
-            } else if entry.kind == Kind::Symlink || attrs.identity(configuration) {
+            } else if entry.kind == Kind::Symlink {
+                if configuration.native_symlinks() {
+                    Action::VerifyClone
+                } else {
+                    Action::GitWrite
+                }
+            } else if attrs.identity(configuration) {
                 Action::VerifyClone
             } else if attrs.auto_binary(configuration) {
                 Action::VerifyAutoBinary
@@ -412,8 +423,10 @@ impl Attributes {
             b"false" | b"no" | b"off" | b"0" => {
                 // "unset" could be -text OR literal text=unset. Both are identity
                 // with autocrlf=false and no eol/crlf, regardless of core.eol.
+                // The native line ending is CRLF in Git for Windows.
                 matches!(text, None | Some(b"unset" | b"unspecified"))
-                    || matches!(config.eol.as_slice(), b"lf" | b"native")
+                    || config.eol == b"lf"
+                    || (config.eol == b"native" && !cfg!(windows))
             }
             _ => false,
         }
@@ -423,9 +436,14 @@ impl Attributes {
 struct Configuration {
     autocrlf: Vec<u8>,
     eol: Vec<u8>,
+    symlinks: bool,
 }
 
 impl Configuration {
+    fn native_symlinks(&self) -> bool {
+        cfg!(unix) && self.symlinks
+    }
+
     fn parse(bytes: &[u8]) -> Result<Self> {
         ensure!(
             bytes.is_empty() || bytes.last() == Some(&0),
@@ -434,6 +452,7 @@ impl Configuration {
         let mut result = Self {
             autocrlf: b"false".to_vec(),
             eol: b"native".to_vec(),
+            symlinks: true,
         };
         for field in bytes.split(|b| *b == 0).filter(|field| !field.is_empty()) {
             let split = field.iter().position(|b| *b == b'\n');
@@ -446,6 +465,12 @@ impl Configuration {
             match key {
                 b"core.autocrlf" => result.autocrlf = value.to_ascii_lowercase(),
                 b"core.eol" => result.eol = value.to_ascii_lowercase(),
+                b"core.symlinks" => {
+                    result.symlinks = !matches!(
+                        value.to_ascii_lowercase().as_slice(),
+                        b"false" | b"no" | b"off" | b"0"
+                    )
+                }
                 b"core.attributesfile" => {
                     // ~ expansion and relative paths depend on Git context. Keep the
                     // first implementation to explicit absolute external policy paths.

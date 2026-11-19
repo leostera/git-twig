@@ -1,3 +1,4 @@
+#![cfg_attr(not(unix), allow(unused_imports))]
 use super::*;
 
 #[cfg(unix)]

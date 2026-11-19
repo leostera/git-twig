@@ -33,7 +33,20 @@ impl Stat {
         }
     }
 
-    #[cfg(not(unix))]
+    /// Git for Windows reports the creation time as ctime, the last write time
+    /// as mtime, and zero for the device, inode, owner and group.
+    #[cfg(windows)]
+    pub fn of(metadata: &fs::Metadata) -> Self {
+        use std::os::windows::fs::MetadataExt;
+        Self {
+            ctime: crate::windows::unix_time(metadata.creation_time()),
+            mtime: crate::windows::unix_time(metadata.last_write_time()),
+            bytes: metadata.file_size() as u32,
+            ..Self::default()
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
     pub fn of(_: &fs::Metadata) -> Self {
         Self::default()
     }

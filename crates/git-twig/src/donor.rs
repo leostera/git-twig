@@ -38,7 +38,7 @@ fn parse(bytes: &[u8]) -> Result<Vec<Worktree>> {
                 current.is_none() && !path.is_empty(),
                 "invalid worktree record"
             );
-            let root = PathBuf::from(native::os_string(path.to_vec()));
+            let root = native::git_path(path.to_vec());
             ensure!(root.is_absolute(), "relative path in worktree listing");
             current = Some(Worktree {
                 root,
@@ -145,7 +145,16 @@ fn same_filesystem(root: &Path, parent: &Path) -> bool {
         .is_some_and(|(source, target)| source.is_dir() && source.dev() == target.dev())
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn same_filesystem(root: &Path, parent: &Path) -> bool {
+    fs::symlink_metadata(root).is_ok_and(|metadata| metadata.is_dir())
+        && crate::windows::volume_identity(root)
+            .ok()
+            .zip(crate::windows::volume_identity(parent).ok())
+            .is_some_and(|(source, target)| source == target)
+}
+
+#[cfg(not(any(unix, windows)))]
 fn same_filesystem(_: &Path, _: &Path) -> bool {
     false
 }
@@ -155,12 +164,14 @@ mod tests {
     use super::*;
     #[test]
     fn parses_raw_paths_and_eligibility() -> Result<()> {
-        let mut bytes = b"worktree /repo/odd\n\t\"".to_vec();
+        // Git for Windows lists absolute paths with a drive and forward slashes.
+        let drive = if cfg!(windows) { "C:" } else { "" };
+        let mut bytes = format!("worktree {drive}/repo/odd\n\t\"").into_bytes();
         #[cfg(unix)]
         bytes.push(0xff);
         bytes.extend_from_slice(
             format!(
-                "\0HEAD {}\0locked user lock\0\0worktree /gone\0HEAD {}\0prunable gone\0\0",
+                "\0HEAD {}\0locked user lock\0\0worktree {drive}/gone\0HEAD {}\0prunable gone\0\0",
                 "a".repeat(40),
                 "b".repeat(64)
             )
@@ -171,8 +182,8 @@ mod tests {
         assert!(trees[0].usable);
         assert!(!trees[1].usable);
         assert_eq!(
-            native::path_bytes(&trees[0].root),
-            bytes[9..bytes.iter().position(|b| *b == 0).unwrap()]
+            trees[0].root,
+            native::git_path(bytes[9..bytes.iter().position(|b| *b == 0).unwrap()].to_vec())
         );
         Ok(())
     }

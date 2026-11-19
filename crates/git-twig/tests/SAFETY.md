@@ -23,6 +23,9 @@ independent reflink probe prevents silently testing fallback instead.
 | Destination interference stops installation | Insert foreign file or source-pointing symlink after registration; neither it nor its target is overwritten |
 | HEAD movement invalidates installation | Move detached destination HEAD after registration; reject installation before any target files are moved |
 | Retrying cannot consume another invocation's scratch | Reject reuse of partial destination; succeed at fresh destination; compare retained staging before/after and exact registrations |
+| Windows clones never replace or follow | Block-clone a 70,001-byte file (ends inside a cluster) and an empty file; refuse an existing destination and a directory source with nothing created; private writes never reach the source |
+| Windows paths and volumes match Git | Canonical fixture paths have no verbatim prefix; volume identity is stable; FILETIME conversion matches Git for Windows' index |
+| Disabled symlinks keep the rest shared | `core.symlinks=false` root and nested links are Git-written plain files beside a shared file, on every platform |
 
 `cases/partial_clones.rs` counts promisor fetches in Git's own event trace: none
 for the current revision, at most one batch when target blobs are absent.
