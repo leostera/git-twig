@@ -44,7 +44,10 @@ partial-failure contracts remain in force.
    `check-attr --cached --all -z --stdin`, never donor-worktree policy files.
    Capture effective config and attribute results, recheck before registration
    and against the destination's private target-index context before installation.
-   Conditional includes and externally redirected attribute sources delegate.
+   Conditional includes and externally redirected attribute sources delegate,
+   except includes whose files set only identity, signing, remote, credential
+   or alias keys (amended: issue #4). Those never change checkout bytes; an
+   include of a further file is not such a key.
    Ordinary worktree configuration remains eligible: Git copies config.worktree
    (excluding location/bare settings). Direct relative include.path values in
    that file delegate before staging because their anchor moves to the new Git
