@@ -755,7 +755,10 @@ fn conditional_includes_that_include_checkout_settings_delegate() -> Result<()> 
     let output = checked(f.add()?)?;
     let trace = String::from_utf8_lossy(&output.stderr);
     assert!(!trace.contains("CoW: verified"), "{trace}");
-    assert!(trace.contains("include.path require stock Git"), "{trace}");
+    // Volumes that cannot clone delegate before reading configuration.
+    if cow_available(&f)? {
+        assert!(trace.contains("include.path require stock Git"), "{trace}");
+    }
     assert_eq!(fs::read(f.destination().join("hello.txt"))?, CRLF);
     Ok(())
 }
@@ -774,9 +777,11 @@ fn relative_conditional_includes_delegate() -> Result<()> {
     let output = checked(f.add()?)?;
     let trace = String::from_utf8_lossy(&output.stderr);
     assert!(!trace.contains("CoW: verified"), "{trace}");
-    assert!(
-        trace.contains("relative conditional config includes"),
-        "{trace}"
-    );
+    if cow_available(&f)? {
+        assert!(
+            trace.contains("relative conditional config includes"),
+            "{trace}"
+        );
+    }
     Ok(())
 }
