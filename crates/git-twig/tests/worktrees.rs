@@ -57,6 +57,47 @@ struct Fixture {
     root: PathBuf,
     source: PathBuf,
 }
+/// Fixtures are kept for inspection, so leave them removable: tests make
+/// directories read-only and, on macOS, add deny-delete ACLs, which would
+/// otherwise make `rm -rf` and `cargo clean` fail on them.
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        make_removable(&self.root);
+    }
+}
+
+/// Give the owner write access to every directory under `root`, and on macOS
+/// drop ACLs and user immutable flags. Never follows symbolic links: some
+/// fixtures point outside themselves on purpose.
+fn make_removable(root: &Path) {
+    #[cfg(target_os = "macos")]
+    for (program, args) in [("chmod", ["-R", "-N"]), ("chflags", ["-R", "nouchg"])] {
+        let _ = Command::new(program).args(args).arg(root).output();
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut pending = vec![root.to_path_buf()];
+        while let Some(directory) = pending.pop() {
+            let Ok(metadata) = fs::symlink_metadata(&directory) else {
+                continue;
+            };
+            if !metadata.is_dir() {
+                continue;
+            }
+            let mode = metadata.permissions().mode();
+            if mode & 0o700 != 0o700 {
+                let _ = fs::set_permissions(&directory, fs::Permissions::from_mode(mode | 0o700));
+            }
+            if let Ok(entries) = fs::read_dir(&directory) {
+                pending.extend(entries.flatten().map(|entry| entry.path()));
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = root;
+}
+
 impl Fixture {
     fn new() -> Result<Self> {
         Self::with_object_format("sha1")
