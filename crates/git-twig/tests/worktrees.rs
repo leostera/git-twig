@@ -67,32 +67,52 @@ impl Drop for Fixture {
 }
 
 /// Give the owner write access to every directory under `root`, and on macOS
-/// drop ACLs and user immutable flags. Never follows symbolic links: some
-/// fixtures point outside themselves on purpose.
+/// clear user immutable flags and drop ACLs. Never follows symbolic links:
+/// some fixtures point outside themselves on purpose, even at /etc/passwd.
 fn make_removable(root: &Path) {
-    #[cfg(target_os = "macos")]
-    for (program, args) in [("chmod", ["-R", "-N"]), ("chflags", ["-R", "nouchg"])] {
-        let _ = Command::new(program).args(args).arg(root).output();
-    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        // Files and directories, never symbolic links, which ACL and flag
+        // tools would apply to their targets.
+        let mut entries = Vec::new();
         let mut pending = vec![root.to_path_buf()];
-        while let Some(directory) = pending.pop() {
-            let Ok(metadata) = fs::symlink_metadata(&directory) else {
+        while let Some(path) = pending.pop() {
+            let Ok(metadata) = fs::symlink_metadata(&path) else {
                 continue;
             };
-            if !metadata.is_dir() {
+            if metadata.file_type().is_symlink() {
                 continue;
             }
-            let mode = metadata.permissions().mode();
-            if mode & 0o700 != 0o700 {
-                let _ = fs::set_permissions(&directory, fs::Permissions::from_mode(mode | 0o700));
+            #[cfg(target_os = "macos")]
+            {
+                use std::os::{macos::fs::MetadataExt, unix::ffi::OsStrExt};
+                let flags = metadata.st_flags();
+                if flags & libc::UF_IMMUTABLE != 0
+                    && let Ok(name) = std::ffi::CString::new(path.as_os_str().as_bytes())
+                {
+                    // SAFETY: a NUL-terminated path; lchflags never follows links.
+                    unsafe { libc::lchflags(name.as_ptr(), flags & !libc::UF_IMMUTABLE) };
+                }
             }
-            if let Ok(entries) = fs::read_dir(&directory) {
-                pending.extend(entries.flatten().map(|entry| entry.path()));
+            if metadata.is_dir() {
+                let mode = metadata.permissions().mode();
+                if mode & 0o700 != 0o700 {
+                    let _ = fs::set_permissions(&path, fs::Permissions::from_mode(mode | 0o700));
+                }
+                if let Ok(children) = fs::read_dir(&path) {
+                    pending.extend(children.flatten().map(|entry| entry.path()));
+                }
             }
+            entries.push(path);
         }
+        // `chmod -N` with explicit non-link paths, never -R.
+        #[cfg(target_os = "macos")]
+        for chunk in entries.chunks(256) {
+            let _ = Command::new("chmod").arg("-N").args(chunk).output();
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = entries;
     }
     #[cfg(not(unix))]
     let _ = root;
