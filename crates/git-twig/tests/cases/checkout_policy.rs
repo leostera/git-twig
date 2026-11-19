@@ -56,11 +56,54 @@ fn compare_stock(f: &Fixture, paths: &[&str], require_native: bool) -> Result<Ou
             "{name}"
         );
     }
+    // Git may call a file whose clean conversion differs from its blob
+    // modified or clean, depending on whether it trusts the file's recorded
+    // stat data or finds it racily clean and rehashes it. So both checkouts
+    // must agree from content alone, and each one's status may only omit
+    // files that content calls modified, never add any.
+    let content = content_status(&f.destination())?;
     assert_eq!(
-        git(&f.destination(), &["status", "--porcelain"])?.stdout,
-        git(&f.root.join("stock"), &["status", "--porcelain"])?.stdout
+        content,
+        content_status(&f.root.join("stock"))?,
+        "content status"
     );
+    for worktree in [f.destination(), f.root.join("stock")] {
+        let status = git(&worktree, &["status", "--porcelain"])?.stdout;
+        let expected: Vec<&[u8]> = content.split(|b| *b == b'\n').collect();
+        for line in status.split(|b| *b == b'\n') {
+            assert!(
+                expected.contains(&line),
+                "{}: {:?} is not in the content status {:?}",
+                worktree.display(),
+                String::from_utf8_lossy(line),
+                String::from_utf8_lossy(&content)
+            );
+        }
+    }
     Ok(output)
+}
+
+/// `git status` judged from file contents alone, without recorded stat data,
+/// using a copy of the index so the worktree's own index is untouched.
+fn content_status(worktree: &Path) -> Result<Vec<u8>> {
+    let index = String::from_utf8(git(worktree, &["rev-parse", "--git-path", "index"])?.stdout)?;
+    let index = worktree.join(index.trim());
+    let copy = index.with_extension("content-status");
+    fs::copy(&index, &copy)?;
+    let with_copy = |args: &[&str]| {
+        command("git", worktree)
+            .env("GIT_INDEX_FILE", &copy)
+            .args(args)
+            .output()
+    };
+    // Rebuild the copy from its own tree: read-tree records no stat data,
+    // so status must hash every file (--really-refresh still trusts matching
+    // stat data).
+    let tree = String::from_utf8(checked(with_copy(&["write-tree"])?)?.stdout)?;
+    checked(with_copy(&["read-tree", tree.trim()])?)?;
+    let status = checked(with_copy(&["status", "--porcelain"])?)?.stdout;
+    fs::remove_file(&copy)?;
+    Ok(status)
 }
 
 #[test]
