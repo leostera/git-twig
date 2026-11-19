@@ -26,6 +26,8 @@ independent reflink probe prevents silently testing fallback instead.
 | Windows clones never replace or follow | Block-clone a 70,001-byte file (ends inside a cluster) and an empty file; refuse an existing destination and a directory source with nothing created; private writes never reach the source |
 | Windows paths and volumes match Git | Canonical fixture paths have no verbatim prefix; volume identity is stable; FILETIME conversion matches Git for Windows' index |
 | Disabled symlinks keep the rest shared | `core.symlinks=false` root and nested links are Git-written plain files beside a shared file, on every platform |
+| Windows moves undo on open files | A file held open in main blocks its move after a child moved; every move is undone, files and index unchanged, journal retained |
+| Windows dedupe is locked, in place | Shares a 300,001-byte file keeping identity, attributes, last write time and index; skips files open for writing (target or donor), mapped writable with no open handle, reached through a junction, or hardlinked; writers still write their own file |
 
 `cases/partial_clones.rs` counts promisor fetches in Git's own event trace: none
 for the current revision, at most one batch when target blobs are absent.

@@ -3,11 +3,15 @@ use super::*;
 #[cfg(target_os = "linux")]
 #[path = "adopt_linux.rs"]
 mod linux;
-use std::{
-    collections::BTreeMap,
-    os::unix::fs::{MetadataExt, PermissionsExt, symlink},
-};
+#[cfg(windows)]
+#[path = "adopt_windows.rs"]
+mod windows;
+use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
+/// Everything adoption must preserve about a file. Windows has no mode, owner
+/// or group bits; its file attributes take their place.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Snapshot {
     bytes: Vec<u8>,
@@ -18,6 +22,36 @@ pub(super) struct Snapshot {
     uid: u32,
     gid: u32,
     mtime: (i64, i64),
+}
+
+#[cfg(unix)]
+fn snapshot(_: &Path, stat: &fs::Metadata, bytes: Vec<u8>) -> Result<Snapshot> {
+    Ok(Snapshot {
+        bytes,
+        mode: stat.mode(),
+        inode: stat.ino(),
+        device: stat.dev(),
+        links: stat.nlink(),
+        uid: stat.uid(),
+        gid: stat.gid(),
+        mtime: (stat.mtime(), stat.mtime_nsec()),
+    })
+}
+#[cfg(windows)]
+fn snapshot(path: &Path, stat: &fs::Metadata, bytes: Vec<u8>) -> Result<Snapshot> {
+    use std::os::windows::fs::MetadataExt;
+    let (volume, index, links) = windows_identity(path)?;
+    let written = stat.last_write_time();
+    Ok(Snapshot {
+        bytes,
+        mode: stat.file_attributes(),
+        inode: index,
+        device: volume.into(),
+        links: links.into(),
+        uid: 0,
+        gid: 0,
+        mtime: ((written / 10_000_000) as i64, (written % 10_000_000) as i64),
+    })
 }
 
 pub(super) fn files(root: &Path) -> Result<BTreeMap<PathBuf, Snapshot>> {
@@ -46,16 +80,7 @@ pub(super) fn files(root: &Path) -> Result<BTreeMap<PathBuf, Snapshot>> {
             };
             result.insert(
                 path.strip_prefix(root)?.to_path_buf(),
-                Snapshot {
-                    bytes,
-                    mode: stat.mode(),
-                    inode: stat.ino(),
-                    device: stat.dev(),
-                    links: stat.nlink(),
-                    uid: stat.uid(),
-                    gid: stat.gid(),
-                    mtime: (stat.mtime(), stat.mtime_nsec()),
-                },
+                snapshot(&path, &stat, bytes)?,
             );
         }
         Ok(())
@@ -71,7 +96,7 @@ pub(super) fn index(path: &Path) -> Result<Vec<u8>> {
     )?;
     Ok(fs::read(String::from_utf8(output.stdout)?.trim_end())?)
 }
-fn stages(f: &Fixture) -> Result<Vec<PathBuf>> {
+pub(super) fn stages(f: &Fixture) -> Result<Vec<PathBuf>> {
     Ok(fs::read_dir(f.source.join(".git"))?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
@@ -84,12 +109,17 @@ fn stages(f: &Fixture) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
+// Windows names cannot hold control characters.
+#[cfg(unix)]
+const UNUSUAL: &str = "雪\tline\n.bin";
+#[cfg(windows)]
+const UNUSUAL: &str = "雪 line.bin";
+
 #[test]
 fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Result<()> {
     for format in ["sha1", "sha256"] {
         let f = Fixture::with_object_format(format)?;
-        #[cfg(target_os = "linux")]
-        if !linux_reflinks_available(&f)? {
+        if !cow_available(&f)? {
             continue;
         }
         fs::create_dir(f.source.join("sub"))?;
@@ -100,7 +130,7 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
             "missing",
             "hardlink",
             "sub/file",
-            "雪\tline\n.bin",
+            UNUSUAL,
         ] {
             fs::write(f.source.join(name), b"committed\n")?;
         }
@@ -108,6 +138,7 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
             f.source.join("large.bin"),
             (0..131072).map(|i| (i % 251) as u8).collect::<Vec<_>>(),
         )?;
+        #[cfg(unix)]
         symlink("hello.txt", f.source.join("link"))?;
         git(&f.source, &["add", "."])?;
         git(&f.source, &["commit", "-m", "adoption input"])?;
@@ -121,10 +152,17 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
             fs::write(root.join("staged.txt"), b"current dirty bytes\n")?;
             fs::write(root.join("dirty.bin"), b"same dirty binary\x00\xff\n")?;
         }
+        #[cfg(unix)]
         fs::set_permissions(
             f.destination().join("large.bin"),
             fs::Permissions::from_mode(0o751),
         )?;
+        #[cfg(windows)]
+        {
+            let mut permissions = fs::metadata(f.destination().join("large.bin"))?.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(f.destination().join("large.bin"), permissions)?;
+        }
         fs::write(f.destination().join("different"), b"different!\n")?;
         fs::rename(
             f.destination().join("missing"),
@@ -135,7 +173,16 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
             f.root.join("retained-hardlink"),
         )?;
         fs::rename(f.destination().join("sub"), f.root.join("outside"))?;
+        #[cfg(unix)]
         symlink(f.root.join("outside"), f.destination().join("sub"))?;
+        // A junction is the Windows directory link that needs no privilege.
+        #[cfg(windows)]
+        checked(
+            command("cmd", &f.destination())
+                .args(["/C", "mklink", "/J", "sub"])
+                .arg(f.root.join("outside"))
+                .output()?,
+        )?;
         fs::write(f.destination().join("untracked"), b"do not adopt")?;
         #[cfg(target_os = "macos")]
         {
@@ -190,6 +237,7 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
         }
         let stages = stages(&f)?;
         assert_eq!(stages.len(), 1);
+        #[cfg(unix)]
         assert_eq!(fs::metadata(&stages[0])?.mode() & 0o777, 0o700);
         let mut count = 0;
         for entry in fs::read_dir(&stages[0])? {
@@ -202,13 +250,14 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
                 continue;
             }
             count += 1;
-            let stat = entry.metadata()?;
-            assert_eq!(stat.nlink(), 1);
+            let candidate = snapshot(&entry.path(), &entry.metadata()?, Vec::new())?;
+            assert_eq!(candidate.links, 1);
             assert!(
                 !before_source
                     .values()
                     .chain(before_target.values())
-                    .any(|original| original.inode == stat.ino() && original.device == stat.dev())
+                    .any(|original| original.inode == candidate.inode
+                        && original.device == candidate.device)
             );
             fs::write(entry.path(), b"private candidate write")?;
         }
@@ -247,8 +296,7 @@ fn adoption_rejects_bad_targets_and_unsupported_modes_without_scratch() -> Resul
 #[test]
 fn adoption_does_not_run_checkout_filters_or_index_hooks() -> Result<()> {
     let f = Fixture::new()?;
-    #[cfg(target_os = "linux")]
-    if !linux_reflinks_available(&f)? {
+    if !cow_available(&f)? {
         return Ok(());
     }
     fs::write(f.source.join(".gitattributes"), "*.txt filter=sentinel\n")?;
@@ -269,6 +317,7 @@ fn adoption_does_not_run_checkout_filters_or_index_hooks() -> Result<()> {
     let script = "#!/bin/sh\nprintf invoked > \"$0.marker\"\nexit 1\n";
     for name in ["post-index-change", "fsmonitor"] {
         fs::write(hooks.join(name), script)?;
+        #[cfg(unix)]
         fs::set_permissions(hooks.join(name), fs::Permissions::from_mode(0o755))?;
     }
     git(
@@ -296,6 +345,8 @@ fn adoption_does_not_run_checkout_filters_or_index_hooks() -> Result<()> {
     Ok(())
 }
 
+// Windows refuses to rename a file open without delete sharing.
+#[cfg(unix)]
 #[test]
 fn open_writer_demonstrates_why_path_replacement_is_not_live_adoption() -> Result<()> {
     use std::io::Write;

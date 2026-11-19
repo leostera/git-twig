@@ -1,6 +1,7 @@
 use super::adopt::{files, index};
 use super::*;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 fn nested(f: &Fixture) -> Result<PathBuf> {
     let path = f.source.join(".claude/worktrees/agent");
@@ -158,11 +159,11 @@ fn adopts_nested_worktrees_and_main_into_its_own_old_root_without_losing_state()
     let peer_files = files(&peer)?;
     let main_index = index(&f.source)?;
     let peer_index = index(&peer)?;
-    let main_inode = fs::metadata(&f.source)?.ino();
+    let main_inode = file_identity(&f.source)?;
     let output = checked(apply(&peer, &f.source, None)?)?;
     let main = f.source.join("main");
     let target = f.source.join("feat-nested");
-    assert_eq!(fs::metadata(&main)?.ino(), main_inode);
+    assert_eq!(file_identity(&main)?, main_inode);
     assert_eq!(files(&main)?.into_iter().collect::<Vec<_>>(), main_files);
     assert_eq!(files(&target)?, peer_files);
     assert_eq!(index(&main)?, main_index);
@@ -170,9 +171,11 @@ fn adopts_nested_worktrees_and_main_into_its_own_old_root_without_losing_state()
     assert!(!peer.exists());
     assert!(!f.source.join(".git").exists());
     let inventory = git(&main, &["worktree", "list", "--porcelain"])?;
-    let inventory = String::from_utf8(inventory.stdout)?;
-    assert!(inventory.contains(main.to_str().unwrap()));
-    assert!(inventory.contains(target.to_str().unwrap()));
+    // Git for Windows lists `C:/a/b`.
+    let slashes = |text: &str| text.replace('\\', "/");
+    let inventory = slashes(&String::from_utf8(inventory.stdout)?);
+    assert!(inventory.contains(&slashes(main.to_str().unwrap())));
+    assert!(inventory.contains(&slashes(target.to_str().unwrap())));
     let saved = git(
         &target,
         &["config", "--local", "--get", "twig.worktreesDir"],
@@ -343,6 +346,10 @@ fn moving_only_main_repairs_unmoved_external_peers() -> Result<()> {
     clean(&peer)
 }
 
+// The fault is injected by a shell script named git, which Windows will not run
+// in place of git.exe. `open_files_block_relocation_and_roll_back` covers
+// Windows rollback.
+#[cfg(unix)]
 #[test]
 fn repair_failure_rolls_back_every_move_and_retains_recovery_journal() -> Result<()> {
     let f = Fixture::new()?;
@@ -385,6 +392,44 @@ exec "$TWIG_REAL_GIT" "$@"
         .args(["adopt", "--yes", "--worktrees-dir"])
         .arg(&f.source)
         .output()?;
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("original layout was restored"),
+        "{output:?}"
+    );
+    assert_eq!(files(&f.source)?, before);
+    assert_eq!(index(&peer)?, before_index);
+    git(&peer, &["status", "--porcelain"])?;
+    assert!(
+        f.root
+            .read_dir()?
+            .any(|e| e.unwrap().path().join("journal.nul").is_file())
+    );
+    Ok(())
+}
+
+/// Windows refuses to move a directory holding an open file. A file held open
+/// in main makes its move fail after a child checkout has already moved: every
+/// move must be undone, and the journal kept.
+#[cfg(windows)]
+#[test]
+fn open_files_block_relocation_and_roll_back() -> Result<()> {
+    let f = Fixture::new()?;
+    let peer = nested(&f)?;
+    fs::write(peer.join("untracked"), "private bytes\n")?;
+    let before = files(&f.source)?;
+    let before_index = index(&peer)?;
+    // Rust shares delete access by default, which would allow the move.
+    let held = {
+        use std::os::windows::fs::OpenOptionsExt;
+        fs::OpenOptions::new()
+            .read(true)
+            .share_mode(windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ)
+            .open(f.source.join("hello.txt"))?
+    };
+    let root = f.root.join("managed");
+    let output = apply(&f.source, &root, None)?;
+    drop(held);
     assert!(!output.status.success());
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("original layout was restored"),

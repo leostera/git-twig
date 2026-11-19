@@ -1,7 +1,4 @@
 //! Native CoW materialization with Git-owned linked-worktree bookkeeping.
-// Adoption and existing-worktree sharing are Unix-only for now; on Windows their
-// commands refuse with a reason, and their helpers go unused.
-#[cfg_attr(not(unix), allow(dead_code, unused_imports))]
 mod adopt;
 mod checkout;
 #[cfg(target_os = "macos")]
@@ -12,9 +9,7 @@ mod file_bytes;
 mod index;
 mod native;
 mod objects;
-#[cfg_attr(not(unix), allow(dead_code))]
 mod registry;
-#[cfg_attr(not(unix), allow(dead_code))]
 mod sharing;
 mod snapshot;
 mod staging;

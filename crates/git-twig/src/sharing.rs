@@ -53,31 +53,36 @@ impl Request {
 
 pub(super) fn run(cwd: &Path, args: &[OsString]) -> Result<i32> {
     let request = Request::parse(args)?;
-    #[cfg(unix)]
-    return unix::run(cwd, request);
-    #[cfg(not(unix))]
+    #[cfg(any(unix, windows))]
+    return imp::run(cwd, request);
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = (cwd, request);
-        anyhow::bail!("adoption prototype requires Unix");
+        anyhow::bail!("adoption requires macOS, Linux or Windows");
     }
 }
 
-#[cfg(unix)]
-mod unix {
+#[cfg(any(unix, windows))]
+mod imp {
     use super::*;
+    use crate::native::canonicalize;
+    #[cfg(unix)]
+    use std::os::{
+        fd::AsRawFd,
+        unix::fs::{DirBuilderExt, MetadataExt},
+    };
     use std::{
         collections::HashSet,
         fs::{self, File, OpenOptions},
         io::Write,
-        os::{
-            fd::AsRawFd,
-            unix::fs::{DirBuilderExt, MetadataExt},
-        },
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    #[cfg(unix)]
     use crate::file_bytes::{directory, equal, open_relative};
     use crate::registry::git;
+    #[cfg(windows)]
+    use crate::windows::{Access, directory, equal};
     #[cfg(target_os = "linux")]
     use std::os::unix::fs::OpenOptionsExt;
     #[cfg(target_os = "macos")]
@@ -87,23 +92,24 @@ mod unix {
         let root = crate::output_path(
             crate::checked(git(path).args(["rev-parse", "--show-toplevel"]))?.stdout,
         )?;
-        Ok(fs::canonicalize(root)?)
+        canonicalize(root)
     }
     fn common(root: &Path) -> Result<PathBuf> {
-        Ok(fs::canonicalize(crate::output_path(
+        canonicalize(crate::output_path(
             crate::checked(git(root).args([
                 "rev-parse",
                 "--path-format=absolute",
                 "--git-common-dir",
             ]))?
             .stdout,
-        )?)?)
+        )?)
     }
     struct Pair {
         donor: File,
         target: File,
         bytes: u64,
     }
+    #[cfg(unix)]
     fn matching_pair(donor: &File, target: &File, relative: &Path, mode: Mode) -> Result<Pair> {
         let donor = open_relative(donor, relative, false)?;
         let target = open_relative(target, relative, mode == Mode::Dedupe)?;
@@ -113,14 +119,43 @@ mod unix {
         ensure!(a.dev() == b.dev(), "different devices");
         ensure!(a.ino() != b.ino(), "same inode");
         ensure!(a.nlink() == 1 && b.nlink() == 1, "multiply-linked file");
-        ensure!(
-            a.len() > 0 && a.len() == b.len(),
-            "empty or unequal lengths"
+        compared(donor, target, a.len(), b.len())
+    }
+    /// Windows has no kernel compare-and-share. Deduplication instead holds both
+    /// files open denying writes to everyone else, from this comparison until
+    /// the clusters are shared.
+    #[cfg(windows)]
+    fn matching_pair(donor: &File, target: &File, relative: &Path, mode: Mode) -> Result<Pair> {
+        let (donor_access, target_access) = if mode == Mode::Dedupe {
+            (Access::ReadLocked, Access::WriteLocked)
+        } else {
+            (Access::Read, Access::Read)
+        };
+        let donor = crate::windows::open_relative(donor, relative, donor_access)
+            .context("donor is busy or not a regular file")?;
+        let target = crate::windows::open_relative(target, relative, target_access)
+            .context("target is busy or not a regular file")?;
+        let a = donor.metadata()?;
+        let b = target.metadata()?;
+        ensure!(a.is_file() && b.is_file(), "not two regular files");
+        let (left, right) = (
+            crate::windows::identity_of(&donor)?,
+            crate::windows::identity_of(&target)?,
         );
+        ensure!(left.volume == right.volume, "different volumes");
+        ensure!(left.index != right.index, "same file");
+        ensure!(
+            crate::windows::links(&donor)? == 1 && crate::windows::links(&target)? == 1,
+            "multiply-linked file"
+        );
+        compared(donor, target, a.len(), b.len())
+    }
+    fn compared(donor: File, target: File, a: u64, b: u64) -> Result<Pair> {
+        ensure!(a > 0 && a == b, "empty or unequal lengths");
         let pair = Pair {
             donor,
             target,
-            bytes: a.len(),
+            bytes: a,
         };
         ensure!(
             equal(&pair.donor, &pair.target, pair.bytes)?,
@@ -136,11 +171,17 @@ mod unix {
             std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
-        fs::DirBuilder::new().mode(0o700).create(&path)?;
-        ensure!(
-            fs::symlink_metadata(&path)?.mode() & 0o777 == 0o700,
-            "filesystem cannot protect private preparation scratch; empty directory retained at {path:?}"
-        );
+        #[cfg(unix)]
+        {
+            fs::DirBuilder::new().mode(0o700).create(&path)?;
+            ensure!(
+                fs::symlink_metadata(&path)?.mode() & 0o777 == 0o700,
+                "filesystem cannot protect private preparation scratch; empty directory retained at {path:?}"
+            );
+        }
+        // Windows scratch inherits the Git directory's ACL, as staging does.
+        #[cfg(windows)]
+        fs::create_dir(&path)?;
         eprintln!(
             "git-twig: prepared candidates retained at {path:?}; existing files will NOT be replaced"
         );
@@ -183,7 +224,11 @@ mod unix {
         );
         Ok(())
     }
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(windows)]
+    fn clone_descriptor(source: &File, destination: &Path) -> Result<()> {
+        crate::windows::clone_handle(source, destination)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     fn clone_descriptor(_: &File, _: &Path) -> Result<()> {
         anyhow::bail!("native cloning unavailable")
     }
@@ -192,15 +237,18 @@ mod unix {
         crate::registry::ensure_environment()?;
         if request.mode == Mode::Dedupe {
             ensure!(
-                cfg!(all(
-                    target_os = "linux",
-                    any(target_arch = "x86_64", target_arch = "aarch64")
+                cfg!(any(
+                    all(
+                        target_os = "linux",
+                        any(target_arch = "x86_64", target_arch = "aarch64")
+                    ),
+                    windows
                 )),
-                "in-place adoption is Linux-only; APFS live file replacement is intentionally unsupported"
+                "in-place adoption requires Linux or Windows; APFS live file replacement is intentionally unsupported"
             );
         }
         let donor_path = repository(cwd)?;
-        let target_path = fs::canonicalize(cwd.join(&request.target))?;
+        let target_path = canonicalize(cwd.join(&request.target))?;
         ensure!(
             repository(&target_path)? == target_path,
             "target must be the worktree root"
@@ -220,9 +268,9 @@ mod unix {
         );
         let registered = crate::registry::read(&donor_path)?;
         ensure!(
-            registered.iter().any(|record| {
-                fs::canonicalize(&record.path).ok().as_ref() == Some(&target_path)
-            }),
+            registered
+                .iter()
+                .any(|record| { canonicalize(&record.path).ok().as_ref() == Some(&target_path) }),
             "target is not a registered worktree"
         );
         let output = crate::checked(git(&target_path).args([
@@ -431,9 +479,17 @@ mod unix {
         Ok(())
     }
 
-    #[cfg(not(all(
-        target_os = "linux",
-        any(target_arch = "x86_64", target_arch = "aarch64")
+    #[cfg(windows)]
+    fn dedupe(pair: &Pair) -> Result<u64> {
+        crate::windows::dedupe_locked(&pair.donor, &pair.target, pair.bytes)
+    }
+
+    #[cfg(not(any(
+        all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "aarch64")
+        ),
+        windows
     )))]
     fn dedupe(_: &Pair) -> Result<u64> {
         anyhow::bail!("in-place deduplication unavailable")

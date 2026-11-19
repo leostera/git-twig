@@ -122,12 +122,12 @@ pub(super) fn run(cwd: &Path, args: &[OsString]) -> Result<i32> {
         return crate::sharing::run(cwd, args);
     }
     let request = Request::parse(args)?;
-    #[cfg(unix)]
-    return unix::run(cwd, request);
-    #[cfg(not(unix))]
+    #[cfg(any(unix, windows))]
+    return layout::run(cwd, request);
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = (cwd, request);
-        bail!("layout adoption currently requires macOS or Linux");
+        bail!("layout adoption requires macOS, Linux or Windows");
     }
 }
 
@@ -190,17 +190,13 @@ pub(super) fn creation_args(cwd: &Path, args: &[OsString]) -> Result<Vec<OsStrin
     Ok(args)
 }
 
-#[cfg(unix)]
-mod unix {
+#[cfg(any(unix, windows))]
+mod layout {
     use super::*;
+    use crate::native::canonicalize;
     use std::{
         collections::HashSet,
-        ffi::CString,
         fs::{File, OpenOptions},
-        os::unix::{
-            ffi::OsStrExt,
-            fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
-        },
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -216,7 +212,7 @@ mod unix {
                 !matches!(first.checkout, Checkout::Bare),
                 "bare repositories have no main checkout to adopt"
             );
-            let main = fs::canonicalize(&first.path)?;
+            let main = canonicalize(&first.path)?;
             ensure!(
                 fs::symlink_metadata(main.join(".git"))?.is_dir(),
                 "main checkout must own its .git directory; external or symlinked Git metadata is unsupported"
@@ -246,13 +242,34 @@ mod unix {
         device: u64,
         inode: u64,
     }
+    #[cfg(unix)]
     fn identity(path: &Path) -> Result<Identity> {
+        use std::os::unix::fs::MetadataExt;
         let stat = fs::symlink_metadata(path)?;
         ensure!(stat.is_dir(), "checkout is not a real directory: {path:?}");
         Ok(Identity {
             device: stat.dev(),
             inode: stat.ino(),
         })
+    }
+    #[cfg(windows)]
+    fn identity(path: &Path) -> Result<Identity> {
+        let id = crate::windows::identity(path)?;
+        ensure!(id.directory, "checkout is not a real directory: {path:?}");
+        Ok(Identity {
+            device: id.volume.into(),
+            inode: id.index,
+        })
+    }
+    /// The filesystem holding a path, followed through links like `metadata`.
+    fn device(path: &Path) -> Result<u64> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            Ok(fs::metadata(path)?.dev())
+        }
+        #[cfg(windows)]
+        Ok(crate::windows::volume_identity(&canonicalize(path)?)?.into())
     }
     struct Relocation {
         from: PathBuf,
@@ -287,7 +304,7 @@ mod unix {
                 .parent()
                 .context("destination has no existing ancestor")?;
         }
-        let mut result = fs::canonicalize(prefix)?;
+        let mut result = canonicalize(prefix)?;
         ensure!(result.is_dir(), "destination ancestor is not a directory");
         for name in suffix.into_iter().rev() {
             result.push(name);
@@ -313,7 +330,7 @@ mod unix {
             .stdout,
         )?;
         ensure!(
-            fs::canonicalize(root)? == checkout && fs::canonicalize(common)? == main.join(".git"),
+            canonicalize(root)? == checkout && canonicalize(common)? == main.join(".git"),
             "registration points at another checkout/repository: {checkout:?}"
         );
         let git_dir = crate::output_path(
@@ -357,7 +374,7 @@ mod unix {
     fn selected_path(cwd: &Path, target: &Option<PathBuf>) -> Result<Option<PathBuf>> {
         target
             .as_ref()
-            .map(|p| fs::canonicalize(cwd.join(p)).map_err(Into::into))
+            .map(|p| canonicalize(cwd.join(p)))
             .transpose()
     }
     impl Plan {
@@ -369,7 +386,7 @@ mod unix {
             let mut main_destination = repository.main.clone();
             let device = identity(&repository.main)?.device;
             ensure!(
-                fs::metadata(existing_ancestor(&root)?)?.dev() == device,
+                self::device(existing_ancestor(&root)?)? == device,
                 "worktrees directory is on a different filesystem; cross-device relocation is unsupported"
             );
             ensure!(
@@ -377,7 +394,7 @@ mod unix {
                 "main checkout is a mount point; cannot park it safely"
             );
             for (i, record) in repository.records.iter().enumerate() {
-                let from = fs::canonicalize(&record.path).with_context(|| {
+                let from = canonicalize(&record.path).with_context(|| {
                     format!(
                         "missing registered worktree {:?}; repair it first",
                         record.path
@@ -410,8 +427,8 @@ mod unix {
                 } else {
                     match &record.checkout {
                         Checkout::Branch { reference, .. } => {
-                            let bytes = reference
-                                .as_bytes()
+                            let bytes = crate::native::path_bytes(Path::new(reference));
+                            let bytes = bytes
                                 .strip_prefix(b"refs/heads/")
                                 .context("unsupported branch reference")?;
                             slot(&crate::native::os_string(bytes.to_vec()))?
@@ -550,6 +567,10 @@ mod unix {
                 println!(
                     "macOS: move-only sharing will remain unchanged; optional compaction replaces file identities and requires saved, closed worktrees."
                 );
+            } else if cfg!(windows) {
+                println!(
+                    "Windows: after relocation, attempt safe in-place deduplication on ReFS; physical savings are not measured."
+                );
             } else {
                 println!(
                     "Linux: after relocation, attempt safe in-place deduplication; physical savings are not measured."
@@ -574,8 +595,8 @@ mod unix {
     }
     pub(super) fn run(cwd: &Path, request: Request) -> Result<i32> {
         ensure!(
-            cfg!(any(target_os = "macos", target_os = "linux")),
-            "layout adoption currently requires macOS or Linux"
+            cfg!(any(target_os = "macos", target_os = "linux", windows)),
+            "layout adoption requires macOS, Linux or Windows"
         );
         let repository = Repository::read(cwd)?;
         let selected = selected_path(cwd, &request.target)?;
@@ -612,7 +633,7 @@ mod unix {
             if request.sharing == Sharing::Automatic
                 && let Some(target) = selected
             {
-                let donor = fs::canonicalize(crate::output_path(
+                let donor = canonicalize(crate::output_path(
                     crate::checked(git(cwd).args(["rev-parse", "--show-toplevel"]))?.stdout,
                 )?)?;
                 if donor != target && target != plan.repository.main {
@@ -642,7 +663,7 @@ mod unix {
             println!("Adoption canceled; nothing changed.");
             return Ok(0);
         }
-        let _lock = crate::lock_registration(&plan.repository.main)?;
+        let lock = crate::lock_registration(&plan.repository.main)?;
         ensure!(
             registry::read(&plan.repository.main)? == plan.repository.records,
             "registration changed after preview; rerun adopt"
@@ -666,6 +687,21 @@ mod unix {
         } else {
             None
         };
+        // Windows cannot move a directory that is any process's working
+        // directory, this one included. Twig's own Git commands name theirs.
+        std::env::set_current_dir(
+            plan.repository
+                .main
+                .parent()
+                .context("main has no parent")?,
+        )?;
+        // Nor one holding an open file, however it is shared: the lock lives in
+        // main's Git directory. Release it; a Twig registering meanwhile holds
+        // that lock file open, so moving main fails and every move is undone.
+        #[cfg(windows)]
+        drop(lock);
+        #[cfg(not(windows))]
+        let _lock = lock;
         apply(&plan)?;
         crate::checked(
             git(&plan.main_destination)
@@ -719,7 +755,7 @@ mod unix {
         for target in plan.targets(false) {
             crate::compact::preview(&plan.repository.main, &target)?.show(&target, true);
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         if sharing == Sharing::Compact {
             for target in plan.targets(false) {
                 crate::sharing::run(
@@ -731,7 +767,7 @@ mod unix {
         Ok(())
     }
     fn share_after_move(plan: &Plan) {
-        if !cfg!(target_os = "linux") {
+        if !cfg!(any(target_os = "linux", windows)) {
             return;
         }
         for record in &plan.repository.records {
@@ -768,6 +804,30 @@ mod unix {
         path: PathBuf,
         undo: Vec<Undo>,
     }
+    /// Unix modes keep the journal private. On Windows it inherits the ACL of
+    /// the directory holding the checkouts, which already guards their files.
+    fn private_journal(path: &Path) -> Result<File> {
+        #[cfg_attr(not(unix), allow(unused_mut))]
+        let mut directory = fs::DirBuilder::new();
+        let mut journal = OpenOptions::new();
+        journal.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+            directory.mode(0o700);
+            journal.mode(0o600);
+        }
+        directory.create(path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            ensure!(
+                fs::metadata(path)?.mode() & 0o777 == 0o700,
+                "cannot protect recovery journal: {path:?}"
+            );
+        }
+        Ok(journal.open(path.join("journal.nul"))?)
+    }
     impl Transaction {
         fn new(plan: &Plan) -> Result<Self> {
             let parent = plan
@@ -780,16 +840,7 @@ mod unix {
                 std::process::id(),
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
             ));
-            fs::DirBuilder::new().mode(0o700).create(&path)?;
-            ensure!(
-                fs::metadata(&path)?.mode() & 0o777 == 0o700,
-                "cannot protect recovery journal: {path:?}"
-            );
-            let journal = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(path.join("journal.nul"))?;
+            let journal = private_journal(&path)?;
             let mut transaction = Self {
                 journal,
                 path,
@@ -828,11 +879,11 @@ mod unix {
         }
         fn record(&mut self, operation: &str, from: &Path, to: &Path) -> Result<()> {
             for field in [
-                operation.as_bytes(),
-                from.as_os_str().as_bytes(),
-                to.as_os_str().as_bytes(),
+                operation.as_bytes().to_vec(),
+                crate::native::path_bytes(from),
+                crate::native::path_bytes(to),
             ] {
-                self.journal.write_all(field)?;
+                self.journal.write_all(&field)?;
                 self.journal.write_all(b"\0")?;
             }
             self.journal.sync_all()?;
@@ -840,8 +891,15 @@ mod unix {
         }
         fn rename(&mut self, from: &Path, to: &Path) -> Result<()> {
             self.record("rename-intent", from, to)?;
-            rename_exclusive(from, to)
-                .with_context(|| format!("cannot move {from:?} to {to:?}"))?;
+            rename_exclusive(from, to).with_context(|| {
+                if cfg!(windows) {
+                    format!(
+                        "cannot move {from:?} to {to:?}; Windows cannot move a directory while a program has a file open in it or uses it as its current directory, so close editors, terminals and builds there first"
+                    )
+                } else {
+                    format!("cannot move {from:?} to {to:?}")
+                }
+            })?;
             self.undo.push(Undo::Rename {
                 from: from.into(),
                 to: to.into(),
@@ -948,7 +1006,13 @@ mod unix {
 
     /// Never use ordinary rename here: a destination appearing after preview
     /// must cause failure, not replacement of an existing directory or symlink.
+    #[cfg(windows)]
     fn rename_exclusive(from: &Path, to: &Path) -> Result<()> {
+        crate::windows::rename_exclusive(from, to).context("atomic no-replace rename failed")
+    }
+    #[cfg(unix)]
+    fn rename_exclusive(from: &Path, to: &Path) -> Result<()> {
+        use std::{ffi::CString, os::unix::ffi::OsStrExt};
         let from = CString::new(from.as_os_str().as_bytes())?;
         let to = CString::new(to.as_os_str().as_bytes())?;
         #[cfg(target_os = "macos")]

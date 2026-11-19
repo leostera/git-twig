@@ -61,7 +61,8 @@ pub fn clone_path(_: &Path, _: &Path) -> Result<()> {
 }
 
 /// A canonical path Git accepts. On Windows, not the verbatim `\\?\` form.
-pub fn canonicalize(path: &Path) -> Result<std::path::PathBuf> {
+pub fn canonicalize(path: impl AsRef<Path>) -> Result<std::path::PathBuf> {
+    let path = path.as_ref();
     #[cfg(windows)]
     return crate::windows::canonicalize(path);
     #[cfg(not(windows))]

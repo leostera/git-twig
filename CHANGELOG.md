@@ -12,6 +12,9 @@ describe changes from this baseline after they are implemented and verified.
   cloning, with every shared byte verified as on macOS and Linux. NTFS volumes
   delegate to stock Git after one volume query. Builds on issue #4 (mateo-m)
   and PR #3 (InventingMaya). See RFD0027.
+- Windows: `git twig adopt` layout moves, `--prepare` and in-place `--dedupe`
+  on ReFS, holding both files locked against writers from comparison until
+  sharing. Files open for writing or mapped are skipped.
 - `core.symlinks=false` repositories no longer fall back: Git writes symlink
   entries as plain files while every other file stays shared.
 

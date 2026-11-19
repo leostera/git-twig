@@ -36,11 +36,12 @@ uses Twig for creation, and asks before cleanup. Twig does not manage agent sess
 or intercept an app's built-in worktree creation; no client-specific hook is needed
 for agent-directed CLI use.
 
-Native CoW is verified on macOS/APFS and Linux Btrfs/reflink-enabled XFS,
-including the tested OverlayFS layouts below.
+Native CoW is verified on macOS/APFS, Linux Btrfs/reflink-enabled XFS,
+including the tested OverlayFS layouts below, and Windows ReFS, including Dev Drive.
 Creates ordinary linked worktrees from committed files; local changes and ignored
 files aren't copied. Unsupported filesystems (including typical ext4), options and
-checkout semantics use `git worktree`. Set `TWIG_TRACE=1` to see backend selection.
+checkout semantics use `git worktree`, as does NTFS on Windows. Set `TWIG_TRACE=1`
+to see backend selection.
 
 The selected donor, destination and Git metadata must share a clone-capable filesystem for
 native CoW. Twig verifies cloned files against the requested commit; writes are
@@ -67,8 +68,12 @@ Moves preserve branches and staged, dirty, untracked and ignored files, stay on
 one filesystem and never overwrite destinations. Recovery journals are retained.
 Layout moves also require a successful atomic no-overwrite directory-rename
 probe; unsupported drivers are refused before any worktree moves. Submodule
-relocation is not yet supported. Linux can subsequently deduplicate
-matching files in place. On macOS, interactive adoption also offers **offline
+relocation is not yet supported. Windows cannot move a directory while a
+program has a file open in it or uses it as its current directory: close
+editors, terminals and builds in those worktrees first, or Twig undoes every move.
+Linux, and Windows on ReFS, can subsequently deduplicate matching files in place;
+on Windows, files another program has open for writing or mapped are skipped.
+On macOS, interactive adoption also offers **offline
 compaction**: save work and close agents, editors, builds and servers using these
 worktrees first. It replaces matching files with verified CoW clones, preserves
 supported target metadata and staged/dirty contents, then retires verified old
@@ -109,6 +114,8 @@ following these flows.
 | Linux | OpenZFS 2.2.2 (tested guest) | Synced-source `FICLONE`; dirty data may delegate | 80 checkout tests with Git 2.43; minimum-Git environment incomplete |
 | Linux | NFSv4.2 over tested XFS/ZFS server | Clone probes accepted | Full checkout suites budget-stopped; not verified support |
 | Linux | bcachefs | Exploratory; no support claim | Not verified |
+| Windows 11 | ReFS / Dev Drive | Native block cloning (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) | Full test suite, native required |
+| Windows 11 | NTFS | Stock Git fallback; no savings | Full test suite |
 
 Linux uses the actual clone operation, not a filesystem-name allowlist. Clone
 refusals before registration fall back to stock Git; failures after registration

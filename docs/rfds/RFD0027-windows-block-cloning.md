@@ -52,6 +52,35 @@ and fixed line-ending assumptions in the repository's own checks.
   `core.filemode=false`. Staging uses the repository's setting there instead of
   forcing `core.filemode=true`.
 
+## Adoption on Windows
+
+- **Layout moves** use `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` or
+  `MOVEFILE_COPY_ALLOWED`: the filesystem refuses an occupied destination
+  atomically and never copies across volumes, like `renameat2(RENAME_NOREPLACE)`.
+  Checkout identity is the volume serial number and file index.
+- **Windows will not move a directory while any file in it is open**, whatever
+  its sharing mode, nor while it is a process's current directory. Twig leaves
+  its own working directory first, and releases the registration lock, which
+  lives in main's Git directory, before moving. A Twig registering meanwhile
+  holds that lock file open, so moving main fails and every move is undone. An
+  editor, terminal or build inside a worktree has the same effect; the error
+  says so.
+- **In-place deduplication.** Linux relies on `FIDEDUPERANGE`, which compares
+  and shares under the kernel's own lock. ReFS has no such call. Twig opens
+  both files denying other writers and deletion, compares every byte under
+  those handles, then block-clones the donor's clusters over the target, which
+  keeps its file identity. Windows refuses such a handle while another program
+  has the file open for writing or mapped writable, so those files are skipped,
+  and nothing can write either file between comparison and sharing. The target's
+  last write time is pinned for the handle, so Git's stat data stays valid.
+  Both files must have equal sparse and integrity settings.
+- **Walking paths** opens one component at a time without following reparse
+  points, holding each directory open and denying its deletion, so no name on
+  the way can be swapped for a junction meanwhile. It is the counterpart of
+  `openat(O_NOFOLLOW)`.
+- **Private scratch** for `--prepare` and the recovery journal inherit the ACL
+  of the directory holding them; Windows has no mode bits to check.
+
 ## Changes that apply everywhere
 
 - **`core.symlinks=false` no longer falls back.** Git writes each symlink entry
@@ -71,7 +100,8 @@ and fixed line-ending assumptions in the repository's own checks.
   on checkout. Twig shares only files whose checkout is the identity, so such
   repositories share binary files only. Comparing donors with Git's converted
   bytes would lift this on every platform; it is separate work.
-- `adopt`, `adopt --prepare` and `adopt --dedupe` still refuse on Windows.
+- Offline compaction (`--compact` on macOS) has no Windows counterpart, as it
+  has none on Linux: in-place deduplication takes its place.
 - Paths Windows cannot represent (control characters, reserved names, trailing
   dots) are left to Git, which refuses them.
 
@@ -80,4 +110,7 @@ and fixed line-ending assumptions in the repository's own checks.
 The full suite runs on Windows 11 with Git 2.56: on a Dev Drive with
 `TWIG_TEST_REQUIRE_NATIVE=1`, and on NTFS where every case delegates.
 Tests that observe staging or a native fallback reason now ask the volume
-itself whether it can clone, rather than asking Twig.
+itself whether it can clone, rather than asking Twig. Adoption tests run on
+Windows too, with Windows cases for open files blocking a move and rolling it
+back, and for deduplication skipping files open for writing, mapped writable,
+reached through a junction or hardlinked.

@@ -38,11 +38,9 @@ mod staging_cleanup;
 #[path = "cases/donor_metadata.rs"]
 mod donor_metadata;
 
-#[cfg(unix)]
 #[path = "cases/adopt.rs"]
 mod adopt;
 
-#[cfg(unix)]
 #[path = "cases/adopt_layout.rs"]
 mod adopt_layout;
 
@@ -240,6 +238,46 @@ fn cow_available(f: &Fixture) -> Result<bool> {
     {
         let _ = f;
         Ok(cfg!(target_os = "macos"))
+    }
+}
+
+/// Volume, file index and link count of a path, without following a final
+/// symlink or junction: the Windows counterpart of device, inode and nlink.
+#[cfg(windows)]
+fn windows_identity(path: &Path) -> Result<(u32, u64, u32)> {
+    use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        GetFileInformationByHandle,
+    };
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    // SAFETY: an all-zero structure is a valid output buffer.
+    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    // SAFETY: the handle is live and `info` is writable.
+    let result = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) };
+    ensure!(result != 0, "{}", std::io::Error::last_os_error());
+    Ok((
+        info.dwVolumeSerialNumber,
+        u64::from(info.nFileIndexHigh) << 32 | u64::from(info.nFileIndexLow),
+        info.nNumberOfLinks,
+    ))
+}
+
+/// What a path names: equal values mean the same file or directory.
+fn file_identity(path: &Path) -> Result<(u64, u64)> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let stat = fs::symlink_metadata(path)?;
+        Ok((stat.dev(), stat.ino()))
+    }
+    #[cfg(windows)]
+    {
+        let (volume, index, _) = windows_identity(path)?;
+        Ok((volume.into(), index))
     }
 }
 
