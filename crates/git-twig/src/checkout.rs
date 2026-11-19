@@ -197,6 +197,24 @@ impl<'a> Checkout<'a> {
                 (Action::VerifyConverted, Kind::File { .. }) => converted_verdicts
                     .remove(entry.path.as_path())
                     .unwrap_or(false),
+                // Archived: Git's checkout bytes settle it, binary or text.
+                // Automatic conversion round-trips: a blob with CR is left
+                // alone both ways, one without is converted both ways. So bytes
+                // Git would write are also bytes Git calls unchanged, and their
+                // stat data may be recorded as a checkout records it.
+                (Action::VerifyAutoBinary, Kind::File { .. })
+                    if converted_verdicts.contains_key(entry.path.as_path()) =>
+                {
+                    let equal = converted_verdicts
+                        .remove(entry.path.as_path())
+                        .unwrap_or(false);
+                    if equal {
+                        certificate = Some(Stat::of(&std::fs::symlink_metadata(
+                            self.data.join(&entry.path),
+                        )?));
+                    }
+                    equal
+                }
                 (Action::VerifyClone, Kind::Symlink)
                 | (Action::VerifyAutoBinary, Kind::File { .. }) => {
                     if symlink_objects.is_none() {
@@ -208,13 +226,8 @@ impl<'a> Checkout<'a> {
                         .as_mut()
                         .expect("opened object stream")
                         .compare(self.data, entry)?;
-                    let raw = comparison.equal
-                        && (*action != Action::VerifyAutoBinary || comparison.contains_nul);
-                    // Text under automatic conversion: compare Git's bytes instead.
-                    let converted = converted_verdicts
-                        .remove(entry.path.as_path())
-                        .unwrap_or(false);
-                    raw || converted
+                    comparison.equal
+                        && (*action != Action::VerifyAutoBinary || comparison.contains_nul)
                 }
                 _ => false,
             };
