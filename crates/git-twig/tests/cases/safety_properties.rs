@@ -293,6 +293,19 @@ fn wrapped_twig(f: &Fixture, script: &str, args: &[&str]) -> Result<Output> {
         .env("TWIG_TEST_INTERRUPTED", f.root.join("interrupted"))
         .env("TWIG_TEST_SOURCE", &f.source)
         .env("TWIG_TEST_DESTINATION", f.destination());
+    // A harness started as a background job (`cmd &`) inherits SIGINT ignored,
+    // and Twig rightly leaves an ignored signal alone. Interrupt cases need the
+    // default dispositions a terminal session gives.
+    // SAFETY: signal is async-signal-safe and changes only the forked child.
+    unsafe {
+        use std::os::unix::process::CommandExt;
+        child.pre_exec(|| {
+            for signal in [libc::SIGHUP, libc::SIGINT, libc::SIGTERM] {
+                libc::signal(signal, libc::SIG_DFL);
+            }
+            Ok(())
+        });
+    }
     bounded_output(child)
 }
 
