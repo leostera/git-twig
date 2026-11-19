@@ -111,6 +111,8 @@ jobs:
         shell: pwsh
         env:
           TWIG_TEST_REQUIRE_NATIVE: '1'
+          # Runners are elevated, so cases may create folder-mounted Dev Drives.
+          TWIG_TEST_WINDOWS_VHDX: '1'
         run: |
           $env:TWIG_TEST_FIXTURE_ROOT = "$($env:DEV_DRIVE)/twig-fixtures"
           cargo test -p git-twig --locked
