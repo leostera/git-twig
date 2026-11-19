@@ -10,8 +10,17 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(unix)]
 unsafe extern "C" {
     fn getppid() -> i32;
+}
+/// The calling process, or -1 where the platform has no cheap answer.
+fn parent_pid() -> i32 {
+    #[cfg(unix)]
+    // SAFETY: POSIX getppid has no pointer arguments and cannot fail.
+    return unsafe { getppid() };
+    #[cfg(not(unix))]
+    -1
 }
 fn now_ms() -> u128 {
     SystemTime::now()
@@ -49,8 +58,7 @@ fn git_wrapper() -> Result<i32> {
     let args = env::args_os().skip(1).collect::<Vec<_>>();
     let started_at_unix_ms = now_ms();
     let start = Instant::now();
-    // POSIX getppid has no pointer arguments and cannot fail.
-    let parent_pid = unsafe { getppid() };
+    let parent_pid = parent_pid();
     let mut child = Command::new(real).args(&args).spawn()?;
     let git_pid = child.id();
     let status = child.wait()?;

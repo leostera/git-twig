@@ -27,6 +27,8 @@ enum Filesystem {
     Host,
     LinuxXfsImage,
     LinuxBtrfsImage,
+    /// A fresh ReFS Dev Drive in a VHDX, mounted at a folder on NTFS.
+    WindowsDevDrive,
 }
 
 impl Filesystem {
@@ -35,7 +37,8 @@ impl Filesystem {
             Self::IsolatedImage
             | Self::CaseSensitiveImage
             | Self::LinuxXfsImage
-            | Self::LinuxBtrfsImage => Ok(Some(settled_space(path)?)),
+            | Self::LinuxBtrfsImage
+            | Self::WindowsDevDrive => Ok(Some(settled_space(path)?)),
             Self::Host => Ok(None),
         }
     }
@@ -107,6 +110,12 @@ struct Cohort {
     growth_after_create_bytes: Option<i128>,
     growth_after_status_bytes: Option<i128>,
     private_write_growth_bytes: Option<i128>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_data_growth_after_create_bytes: Option<i128>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_data_growth_after_status_bytes: Option<i128>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_data_private_write_growth_bytes: Option<i128>,
     operations: Vec<Operation>,
 }
 #[derive(Serialize, Clone)]
@@ -116,6 +125,11 @@ struct Space {
     total_bytes: u64,
     stable: bool,
     observed_allocated_bytes: Vec<u64>,
+    /// Distinct physical clusters referenced by files on the volume, each
+    /// counted once however many files share it. Windows only: ReFS volume
+    /// free space swings by hundreds of MiB as it releases space lazily.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_data_bytes: Option<u64>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -194,8 +208,8 @@ fn main() -> Result<()> {
         return Ok(());
     }
     ensure!(
-        cfg!(any(target_os = "macos", target_os = "linux")),
-        "image benchmarks require macOS or Linux"
+        cfg!(any(target_os = "macos", target_os = "linux", windows)),
+        "image benchmarks require macOS, Linux or Windows"
     );
     let cwd = env::current_dir()?;
     let mut repositories = Vec::new();
@@ -227,7 +241,7 @@ fn main() -> Result<()> {
                     !repositories.iter().any(|r: &Repository| r.label == label),
                     "duplicate repository label"
                 );
-                let path = fs::canonicalize(path)?;
+                let path = canonical(Path::new(path))?;
                 let commit = git_text(&path, &["rev-parse", "HEAD"])?;
                 repositories.push(Repository {
                     label: label.into(),
@@ -280,6 +294,7 @@ fn main() -> Result<()> {
                     "case-sensitive-image" => Filesystem::CaseSensitiveImage,
                     "linux-xfs-image" => Filesystem::LinuxXfsImage,
                     "linux-btrfs-image" => Filesystem::LinuxBtrfsImage,
+                    "windows-dev-drive" => Filesystem::WindowsDevDrive,
                     _ => anyhow::bail!(
                         "filesystem must be host, isolated-image, case-sensitive-image, linux-xfs-image or linux-btrfs-image"
                     ),
@@ -307,6 +322,7 @@ fn main() -> Result<()> {
         match filesystem {
             Filesystem::LinuxXfsImage | Filesystem::LinuxBtrfsImage => cfg!(target_os = "linux"),
             Filesystem::IsolatedImage | Filesystem::CaseSensitiveImage => cfg!(target_os = "macos"),
+            Filesystem::WindowsDevDrive => cfg!(windows),
             Filesystem::Host => true,
         },
         "selected image format is not supported on this platform"
@@ -327,14 +343,21 @@ fn main() -> Result<()> {
     let output =
         output.unwrap_or_else(|| cwd.join(format!("target/real-results/{timestamp}.json")));
     ensure!(!output.exists(), "refusing to overwrite an existing run");
-    let root = cwd.join(format!(
-        "target/real-images/{timestamp}-{}",
-        std::process::id()
-    ));
+    // Windows volume mount points need an NTFS folder; a Dev Drive checkout
+    // may name one elsewhere.
+    let root = env::var_os("TWIG_BENCH_IMAGE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| cwd.join("target/real-images"))
+        .join(format!("{timestamp}-{}", std::process::id()));
     fs::create_dir_all(&root)?;
-    let root = fs::canonicalize(root)?;
-    let candidate = fs::canonicalize(candidate_path)?;
-    let digest = if cfg!(target_os = "linux") {
+    let root = canonical(&root)?;
+    let candidate = canonical(&candidate_path)?;
+    let digest = if cfg!(windows) {
+        powershell(&format!(
+            "(Get-FileHash -Algorithm SHA256 -LiteralPath '{}').Hash.ToLower()",
+            candidate.display()
+        ))?
+    } else if cfg!(target_os = "linux") {
         capture(&cwd, "sha256sum", &[candidate.as_os_str().into()])?
     } else {
         capture(
@@ -343,7 +366,9 @@ fn main() -> Result<()> {
             &["-a".into(), "256".into(), candidate.as_os_str().into()],
         )?
     };
-    let cpu = if cfg!(target_os = "linux") {
+    let cpu = if cfg!(windows) {
+        powershell("(Get-CimInstance Win32_Processor).Name")?
+    } else if cfg!(target_os = "linux") {
         fs::read_to_string("/proc/cpuinfo")?
             .lines()
             .find_map(|line| {
@@ -364,7 +389,7 @@ fn main() -> Result<()> {
         commit: git_text(&cwd, &["rev-parse", "HEAD"])?, dirty: !git_text(&cwd, &["status", "--porcelain"])?.is_empty(),
         candidate_sha256: digest.split_whitespace().next().context("missing candidate hash")?.into(),
         git_version: capture(&cwd, "git", &["--version".into()])?,
-        platform: format!("{} {} {}", env::consts::OS, env::consts::ARCH, capture(&cwd, "uname", &["-r".into()])?),
+        platform: format!("{} {} {}", env::consts::OS, env::consts::ARCH, if cfg!(windows) { powershell("[Environment]::OSVersion.VersionString")? } else { capture(&cwd, "uname", &["-r".into()])? }),
         cpu, concurrency, worktrees_per_cohort: worktrees, repeats, repositories: repositories.clone(),
         notes: vec![
             "Each image-backed backend/repeat gets a fresh, isolated sparse filesystem image (capacity/format recorded in imageSizeGiB/filesystem). Seed uses git clone --shared --no-checkout plus explicit pinned-commit checkout. Original repositories and object stores are read-only inputs; seed history uses alternates outside image.".into(),
@@ -401,6 +426,13 @@ fn main() -> Result<()> {
             .unwrap_or_else(|_| "see environment".into())
         ));
     }
+    if filesystem == Filesystem::WindowsDevDrive {
+        suite.notes.push("Windows images are fresh expandable VHDX files formatted as ReFS Dev Drives (format.com /DevDrv), mounted at an NTFS folder through diskpart; requires an elevated session. Allocation is total minus free bytes from GetDiskFreeSpaceExW, each sample taken after FlushFileBuffers on the volume handle (ReFS otherwise commits frees and writes up to ~40 s later), sampled until stable. ReFS counts block-cloned clusters once. Images are detached and deleted after each cohort.".into());
+        suite.notes.push(match env::var_os("TWIG_BENCH_GIT_CONFIG_GLOBAL") {
+            Some(path) => format!("Global Git config for every command: {}", fs::read_to_string(&path).map(|text| text.replace('\n', "; ")).unwrap_or_else(|_| path.to_string_lossy().into_owned())),
+            None => "No global Git config: Git for Windows' system defaults, such as core.autocrlf=true, are disabled.".into(),
+        });
+    }
     if filesystem == Filesystem::Host {
         suite.notes.push("Filesystem=host overrides image setup/cleanup notes: fresh cohort directories and warmup worktrees are retained, no allocation snapshots/deltas are reported, no sync is forced. Use isolated-image runs for space comparisons. Input revisions can be pinned to match earlier image runs.".into());
     }
@@ -432,7 +464,8 @@ fn main() -> Result<()> {
                     Filesystem::IsolatedImage
                     | Filesystem::CaseSensitiveImage
                     | Filesystem::LinuxXfsImage
-                    | Filesystem::LinuxBtrfsImage => image.attach(),
+                    | Filesystem::LinuxBtrfsImage
+                    | Filesystem::WindowsDevDrive => image.attach(),
                     Filesystem::Host => fs::create_dir(&image.mount).map_err(Into::into),
                 };
                 let result = prepare.and_then(|()| {
@@ -508,6 +541,8 @@ impl Image {
                     Filesystem::LinuxXfsImage | Filesystem::LinuxBtrfsImage
                 ) {
                     "img"
+                } else if filesystem == Filesystem::WindowsDevDrive {
+                    "vhdx"
                 } else {
                     "sparseimage"
                 },
@@ -519,6 +554,9 @@ impl Image {
         }
     }
     fn attach(&mut self) -> Result<()> {
+        if self.filesystem == Filesystem::WindowsDevDrive {
+            return self.attach_windows();
+        }
         if matches!(
             self.filesystem,
             Filesystem::LinuxXfsImage | Filesystem::LinuxBtrfsImage
@@ -592,7 +630,43 @@ impl Image {
         checked(privileged("chown").arg(owner).arg(&self.mount).output()?)?;
         Ok(())
     }
+    /// Create, partition and format a new VHDX as a ReFS Dev Drive, mounted
+    /// at an empty folder. Only a newly created, benchmark-owned file is used.
+    fn attach_windows(&mut self) -> Result<()> {
+        ensure!(!self.path.exists(), "image already exists");
+        fs::create_dir(&self.mount)?;
+        diskpart(&format!(
+            "create vdisk file=\"{image}\" maximum={mib} type=expandable\nselect vdisk file=\"{image}\"\nattach vdisk\nconvert gpt\ncreate partition primary\nassign mount=\"{mount}\"\n",
+            image = self.path.display(),
+            mib = self.size_gib * 1024,
+            mount = self.mount.display()
+        ))?;
+        self.attached = true;
+        checked(
+            Command::new("format.com")
+                .arg(&self.mount)
+                .args(["/FS:ReFS", "/DevDrv", "/Q", "/V:TwigBench", "/Y"])
+                .output()?,
+        )?;
+        Ok(())
+    }
     fn cleanup(&mut self) -> Result<()> {
+        if self.filesystem == Filesystem::WindowsDevDrive {
+            if self.attached {
+                diskpart(&format!(
+                    "select vdisk file=\"{}\"\ndetach vdisk\n",
+                    self.path.display()
+                ))
+                .with_context(|| format!("image still attached: {}", self.path.display()))?;
+                self.attached = false;
+            }
+            if self.path.exists() {
+                fs::remove_file(&self.path)?;
+            }
+            let _ = fs::remove_dir(&self.mount);
+            eprintln!("  disposable image detached and removed");
+            return Ok(());
+        }
         if matches!(
             self.filesystem,
             Filesystem::LinuxXfsImage | Filesystem::LinuxBtrfsImage
@@ -973,6 +1047,9 @@ fn cohort(
         warmup_cleanup_recovered,
         private_write_file_bytes: probe.map(|probe| probe.data.len()),
         private_write_offset: probe.map(|probe| probe.offset),
+        file_data_growth_after_create_bytes: file_data_delta(&after_create, &before),
+        file_data_growth_after_status_bytes: file_data_delta(&after_status, &before),
+        file_data_private_write_growth_bytes: file_data_delta(&after_private_writes, &after_status),
         growth_after_create_bytes: allocation_delta(&after_create, &before),
         growth_after_status_bytes: allocation_delta(&after_status, &before),
         private_write_growth_bytes: allocation_delta(&after_private_writes, &after_status),
@@ -1040,6 +1117,29 @@ fn allocation_delta(after: &Option<Space>, before: &Option<Space>) -> Option<i12
         .as_ref()
         .zip(before.as_ref())
         .map(|(after, before)| after.allocated_bytes as i128 - before.allocated_bytes as i128)
+}
+
+fn file_data_delta(after: &Option<Space>, before: &Option<Space>) -> Option<i128> {
+    let after = after.as_ref()?.file_data_bytes?;
+    let before = before.as_ref()?.file_data_bytes?;
+    Some(after as i128 - before as i128)
+}
+
+/// Clusters covered by a set of `(first cluster, cluster count)` runs, each
+/// counted once: shared extents of block-cloned files overlap exactly.
+#[cfg_attr(not(windows), allow(dead_code))] // Measured on Windows; tested everywhere.
+fn distinct_clusters(mut runs: Vec<(u64, u64)>) -> u64 {
+    runs.sort_unstable();
+    let mut total = 0;
+    let mut covered_to = 0;
+    for (start, length) in runs {
+        let end = start + length;
+        if end > covered_to {
+            total += end - start.max(covered_to);
+            covered_to = end;
+        }
+    }
+    total
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1264,6 +1364,109 @@ mod platform {
         Ok((total - free, total))
     }
 
+    /// Bytes in the distinct physical clusters that files under `mount`
+    /// reference (FSCTL_GET_RETRIEVAL_POINTERS), so block-cloned clusters count
+    /// once. Excludes filesystem metadata and the volume's own system files.
+    #[cfg(windows)]
+    pub fn file_data_bytes(mount: &Path) -> Result<u64> {
+        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+        use windows_sys::Win32::{
+            Foundation::{ERROR_HANDLE_EOF, ERROR_MORE_DATA},
+            Storage::FileSystem::{
+                FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
+                GetDiskFreeSpaceW,
+            },
+            System::{IO::DeviceIoControl, Ioctl::FSCTL_GET_RETRIEVAL_POINTERS},
+        };
+        let root: Vec<u16> = {
+            use std::os::windows::ffi::OsStrExt;
+            mount.as_os_str().encode_wide().chain([0]).collect()
+        };
+        let (mut sectors, mut bytes, mut free, mut total) = (0, 0, 0, 0);
+        // SAFETY: NUL-terminated path; all outputs are writable.
+        let found = unsafe {
+            GetDiskFreeSpaceW(
+                root.as_ptr(),
+                &mut sectors,
+                &mut bytes,
+                &mut free,
+                &mut total,
+            )
+        };
+        ensure!(
+            found != 0,
+            "cluster size: {}",
+            std::io::Error::last_os_error()
+        );
+        let cluster = u64::from(sectors) * u64::from(bytes);
+
+        let mut runs = Vec::new();
+        let mut pending = vec![mount.to_path_buf()];
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(&directory)? {
+                let entry = entry?;
+                if directory == mount && entry.file_name() == "System Volume Information" {
+                    continue;
+                }
+                let kind = entry.file_type()?;
+                if kind.is_dir() && !kind.is_symlink() {
+                    pending.push(entry.path());
+                    continue;
+                }
+                let file = std::fs::OpenOptions::new()
+                    .access_mode(FILE_READ_ATTRIBUTES)
+                    .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+                    .open(entry.path())?;
+                let mut vcn: i64 = 0;
+                loop {
+                    // RETRIEVAL_POINTERS_BUFFER: extent count, starting VCN,
+                    // then (next VCN, LCN) pairs; u64 storage keeps alignment.
+                    let mut output = [0u64; 2 + 2 * 256];
+                    let mut returned = 0;
+                    // SAFETY: live handle; input and output buffers outlive the call.
+                    let ok = unsafe {
+                        DeviceIoControl(
+                            file.as_raw_handle(),
+                            FSCTL_GET_RETRIEVAL_POINTERS,
+                            (&vcn as *const i64).cast(),
+                            size_of::<i64>() as u32,
+                            output.as_mut_ptr().cast(),
+                            size_of_val(&output) as u32,
+                            &mut returned,
+                            std::ptr::null_mut(),
+                        )
+                    };
+                    let error = std::io::Error::last_os_error();
+                    let more = ok == 0 && error.raw_os_error() == Some(ERROR_MORE_DATA as i32);
+                    if ok == 0 && !more {
+                        // Empty files have no extents.
+                        ensure!(
+                            error.raw_os_error() == Some(ERROR_HANDLE_EOF as i32),
+                            "retrieval pointers of {}: {error}",
+                            entry.path().display()
+                        );
+                        break;
+                    }
+                    let count = (output[0] as u32) as usize;
+                    let mut start = output[1] as i64;
+                    for extent in 0..count {
+                        let next = output[2 + 2 * extent] as i64;
+                        let lcn = output[3 + 2 * extent] as i64;
+                        if lcn >= 0 {
+                            runs.push((lcn as u64, (next - start) as u64)); // -1: sparse hole
+                        }
+                        start = next;
+                    }
+                    if !more || count == 0 {
+                        break;
+                    }
+                    vcn = start;
+                }
+            }
+        }
+        Ok(super::distinct_clusters(runs) * cluster)
+    }
+
     /// Flush the measured filesystem before sampling its allocation.
     pub fn sync(mount: &Path) -> Result<()> {
         #[cfg(unix)]
@@ -1275,10 +1478,52 @@ mod platform {
             let _ = mount;
             ensure!(sync.status()?.success(), "sync failed");
         }
-        // Flushing a whole volume needs administrator rights on Windows. ReFS
-        // reports allocation as it happens; the settle loop still waits.
+        // Flush the volume itself (administrator rights), so ReFS commits its
+        // allocation before free space is read; the settle loop still waits.
         #[cfg(windows)]
-        let _ = mount;
+        {
+            use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+            use windows_sys::Win32::Storage::FileSystem::{
+                FlushFileBuffers, GetVolumeNameForVolumeMountPointW,
+            };
+            let mut folder: Vec<u16> = mount.as_os_str().encode_wide().collect();
+            if folder.last() != Some(&u16::from(b'\\')) {
+                folder.push(u16::from(b'\\'));
+            }
+            folder.push(0);
+            let mut name = [0u16; 64];
+            // SAFETY: NUL-terminated input; the output buffer holds 64 units.
+            let found = unsafe {
+                GetVolumeNameForVolumeMountPointW(
+                    folder.as_ptr(),
+                    name.as_mut_ptr(),
+                    name.len() as u32,
+                )
+            };
+            ensure!(
+                found != 0,
+                "no volume at {}: {}",
+                mount.display(),
+                std::io::Error::last_os_error()
+            );
+            let length = name
+                .iter()
+                .position(|unit| *unit == 0)
+                .unwrap_or(name.len());
+            // `\\?\Volume{...}\` names the root; without the slash, the volume.
+            let volume = String::from_utf16(&name[..length])?;
+            let volume = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(volume.trim_end_matches('\\'))?;
+            // SAFETY: a live volume handle opened for writing.
+            let flushed = unsafe { FlushFileBuffers(volume.as_raw_handle()) };
+            ensure!(
+                flushed != 0,
+                "volume flush failed: {}",
+                std::io::Error::last_os_error()
+            );
+        }
         Ok(())
     }
 }
@@ -1376,6 +1621,11 @@ fn settled_space(mount: &Path) -> Result<Space> {
     // Allocation accounting may continue after sync; require a long quiet window.
     for _ in 0..ALLOCATION_SAMPLING.maximum_samples {
         thread::sleep(Duration::from_millis(ALLOCATION_SAMPLING.interval_ms));
+        // ReFS reports frees and writes only once a checkpoint commits them,
+        // up to about 40 seconds later; a volume flush forces one.
+        if cfg!(windows) {
+            platform::sync(mount)?;
+        }
         snapshot = space(mount)?;
         observations.push(snapshot.allocated_bytes);
         if allocation_has_settled(&observations) {
@@ -1384,6 +1634,10 @@ fn settled_space(mount: &Path) -> Result<Space> {
         }
     }
     snapshot.observed_allocated_bytes = observations;
+    #[cfg(windows)]
+    {
+        snapshot.file_data_bytes = Some(platform::file_data_bytes(mount)?);
+    }
     Ok(snapshot)
 }
 fn space(mount: &Path) -> Result<Space> {
@@ -1393,6 +1647,7 @@ fn space(mount: &Path) -> Result<Space> {
         total_bytes,
         stable: false,
         observed_allocated_bytes: vec![],
+        file_data_bytes: None,
     })
 }
 /// Called only for this cohort's newly-created warmup on a disposable image.
@@ -1455,6 +1710,52 @@ fn remove_owned_warmup(seed: &Path, mount: &Path) -> Result<bool> {
         "warmup remains before baseline"
     );
     Ok(true)
+}
+
+/// A canonical path in the form Git and Windows tools accept: without the
+/// verbatim `\\\\?\\` prefix `fs::canonicalize` gives on Windows.
+fn canonical(path: &Path) -> Result<PathBuf> {
+    let path = fs::canonicalize(path)?;
+    #[cfg(windows)]
+    if let Some(ordinary) = path.to_str().and_then(|text| text.strip_prefix(r"\\?\"))
+        && !ordinary.starts_with("UNC\\")
+    {
+        return Ok(PathBuf::from(ordinary));
+    }
+    Ok(path)
+}
+
+fn powershell(script: &str) -> Result<String> {
+    Ok(String::from_utf8(
+        checked(
+            Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command", script])
+                .output()?,
+        )?
+        .stdout,
+    )?
+    .trim()
+    .to_owned())
+}
+
+/// Run a diskpart script; it reports failures in its output, so check both.
+fn diskpart(script: &str) -> Result<()> {
+    let file = env::temp_dir().join(format!(
+        "twig-bench-diskpart-{}-{}.txt",
+        std::process::id(),
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
+    ));
+    fs::write(&file, script)?;
+    let output = Command::new("diskpart").arg("/s").arg(&file).output();
+    let _ = fs::remove_file(&file);
+    let output = checked(output?)?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    ensure!(
+        !text.contains("DiskPart has encountered an error")
+            && !text.contains("Virtual Disk Service error"),
+        "diskpart failed: {text}"
+    );
+    Ok(())
 }
 
 fn privileged(program: &str) -> Command {
@@ -1723,8 +2024,16 @@ mod tests {
                 total_bytes: 100,
                 stable: true,
                 observed_allocated_bytes: vec![bytes],
+                file_data_bytes: None,
             })
         };
         assert_eq!(allocation_delta(&snapshot(20), &snapshot(24)), Some(-4));
+    }
+    #[test]
+    fn shared_and_overlapping_cluster_runs_count_once() {
+        assert_eq!(distinct_clusters(vec![]), 0);
+        // A file and its full clone, a partial clone, and a private run.
+        let runs = vec![(100, 10), (100, 10), (104, 2), (200, 1), (109, 3)];
+        assert_eq!(distinct_clusters(runs), 10 + 2 + 1);
     }
 }

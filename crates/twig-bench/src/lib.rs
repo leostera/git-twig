@@ -51,9 +51,12 @@ pub fn command(program: impl AsRef<OsStr>, cwd: &Path) -> Command {
     }
     command
         .env("GIT_CONFIG_NOSYSTEM", "1")
+        // A run may name one global config file, such as Git for Windows'
+        // defaults; the suite records it.
         .env(
             "GIT_CONFIG_GLOBAL",
-            if cfg!(windows) { "NUL" } else { "/dev/null" },
+            std::env::var_os("TWIG_BENCH_GIT_CONFIG_GLOBAL")
+                .unwrap_or_else(|| if cfg!(windows) { "NUL" } else { "/dev/null" }.into()),
         )
         .env("GIT_ATTR_NOSYSTEM", "1")
         .env("GIT_TEMPLATE_DIR", "")

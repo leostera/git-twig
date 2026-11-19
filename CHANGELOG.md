@@ -22,6 +22,9 @@ describe changes from this baseline after they are implemented and verified.
   when it equals the bytes `git archive` produces for it. See RFD0028.
 - `core.symlinks=false` repositories no longer fall back: Git writes symlink
   entries as plain files while every other file stays shared.
+- `twig-real-bench --filesystem windows-dev-drive` measures space on fresh
+  ReFS Dev Drives, counting the distinct clusters files reference, because
+  ReFS volume free space moves by hundreds of MiB on its own.
 
 - Optional offline APFS compaction during adoption: `--compact` previews and
   applies verified native CoW replacements with supported target metadata and

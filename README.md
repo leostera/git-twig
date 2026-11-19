@@ -116,13 +116,16 @@ following these flows.
 | Linux | OpenZFS 2.2.2 (tested guest) | Synced-source `FICLONE`; dirty data may delegate | 80 checkout tests with Git 2.43; minimum-Git environment incomplete |
 | Linux | NFSv4.2 over tested XFS/ZFS server | Clone probes accepted | Full checkout suites budget-stopped; not verified support |
 | Linux | bcachefs | Exploratory; no support claim | Not verified |
-| Windows 11 | ReFS / Dev Drive | Native block cloning (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) | Full test suite, native required |
+| Windows 11 | ReFS / Dev Drive | Native block cloning (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`); each file keeps its last partial cluster private | Full test suite, native required; allocation benchmark |
 | Windows 11 | NTFS | Stock Git fallback; no savings | Full test suite |
 
 Linux uses the actual clone operation, not a filesystem-name allowlist. Clone
 refusals before registration fall back to stock Git; failures after registration
 retain partial state for inspection. An accepted clone does not guarantee useful
-disk savings, especially for tiny files. Verification covers the tested setups,
+disk savings, especially for tiny files. ReFS copies the final cluster of any
+file that ends inside one, so on a Dev Drive (4 KiB clusters) each file costs at
+least 4 KiB: a rust-lang/cargo worktree took 11.9 MiB with Twig against 18.8 MiB
+with Git. Verification covers the tested setups,
 not every kernel, mount option or checkout policy. OverlayFS coverage includes
 fresh upper-layer repositories and repositories seeded in lowerdir before mount;
 it is not an allocation benchmark. See [Linux test setup](bench/linux.md).

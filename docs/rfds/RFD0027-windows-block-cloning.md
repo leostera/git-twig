@@ -32,6 +32,13 @@ and fixed line-ending assumptions in the repository's own checks.
   settings, so the destination copies both before cloning. Regions are cluster
   aligned: the last one rounds up past the end of both files, as Windows
   documents, and requests stay below 4 GiB each.
+- **The last partial cluster stays private.** ReFS copies a file's final
+  cluster when the file ends inside it, whatever the order of setting the
+  length and cloning; Windows' own copy engine does the same. A file shares
+  its clusters only while its length is a multiple of the cluster size, and
+  padding would change its bytes. Each cloned file therefore costs one private
+  cluster (4 KiB on a Dev Drive), and files smaller than a cluster save
+  nothing. On rust-lang/cargo, 59% of a worktree's data clusters are shared.
 - **Verification is unchanged.** Every clone is hashed against its blob before
   installation, by the same parallel raw hashing as on Unix.
 - **Early delegation.** Twig asks the destination volume for
@@ -100,10 +107,6 @@ and fixed line-ending assumptions in the repository's own checks.
 
 ## Not covered yet
 
-- `core.autocrlf=true`, the Git for Windows default, converts every text file
-  on checkout. Twig shares only files whose checkout is the identity, so such
-  repositories share binary files only. Comparing donors with Git's converted
-  bytes would lift this on every platform; it is separate work.
 - Offline compaction (`--compact` on macOS) has no Windows counterpart, as it
   has none on Linux: in-place deduplication takes its place.
 - Paths Windows cannot represent (control characters, reserved names, trailing
@@ -117,4 +120,15 @@ Tests that observe staging or a native fallback reason now ask the volume
 itself whether it can clone, rather than asking Twig. Adoption tests run on
 Windows too, with Windows cases for open files blocking a move and rolling it
 back, and for deduplication skipping files open for writing, mapped writable,
-reached through a junction or hardlinked.
+reached through a junction or hardlinked. With `TWIG_TEST_WINDOWS_VHDX=1`
+in an elevated session, cases create a Dev Drive mounted at a folder and
+check that creation clones natively and adoption accepts a main checkout
+directly under it.
+
+Space is measured on fresh Dev Drives in VHDX images
+(`twig-real-bench --filesystem windows-dev-drive`). ReFS volume free space is
+not a usable metric: it moves by hundreds of MiB as ReFS releases space
+lazily, on the next write rather than on a flush. The harness also records
+the distinct physical clusters referenced by files on the volume
+(`FSCTL_GET_RETRIEVAL_POINTERS`), counting shared clusters once, and reports
+both.
