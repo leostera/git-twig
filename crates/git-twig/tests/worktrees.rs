@@ -154,7 +154,7 @@ fn command(program: impl AsRef<std::ffi::OsStr>, cwd: &Path) -> Command {
 }
 #[cfg(unix)]
 fn bounded_output(mut command: Command) -> Result<Output> {
-    use std::{os::unix::process::CommandExt, sync::mpsc, time::Duration};
+    use std::{os::unix::process::CommandExt, sync::mpsc};
     // SAFETY: setpgid is async-signal-safe; isolate only this child and its descendants.
     unsafe {
         command.pre_exec(|| {
@@ -171,19 +171,34 @@ fn bounded_output(mut command: Command) -> Result<Output> {
     let pid = child.id() as libc::pid_t;
     let (done, finished) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
-        if finished.recv_timeout(Duration::from_secs(10)).is_err() {
+        if finished.recv_timeout(DEADLOCK).is_err() {
             // SAFETY: the child created this process group. Kill its descendants too,
             // since a deadlocked grandchild can otherwise keep output pipes open.
             unsafe {
                 libc::kill(-pid, libc::SIGKILL);
             }
+            return true;
         }
+        false
     });
     let result = child.wait_with_output();
     let _ = done.send(());
-    watchdog.join().expect("watchdog panicked");
-    Ok(result?)
+    let killed = watchdog.join().expect("watchdog panicked");
+    let output = result?;
+    // A killed child's output looks like an ordinary failure; never return it.
+    ensure!(
+        !killed,
+        "no exit within {DEADLOCK:?}, so presumed deadlocked and killed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(output)
 }
+
+/// How long a child may run before it is presumed deadlocked. Only a hang
+/// should reach it: a loaded runner (64 parallel tests on Btrfs) takes more
+/// than 10 seconds for ordinary creations.
+#[cfg(unix)]
+const DEADLOCK: std::time::Duration = std::time::Duration::from_secs(120);
 
 /// A canonical path in the form Git accepts: Windows' verbatim `\\?\C:\`
 /// prefix is not understood by Git for Windows.
