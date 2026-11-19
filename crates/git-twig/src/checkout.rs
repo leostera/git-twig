@@ -118,8 +118,9 @@ impl<'a> Checkout<'a> {
             input,
         )?
         .stdout;
-        let actions = parse_attributes(entries, &attributes, &configuration)?;
+        let (actions, archivable) = parse_attributes(entries, &attributes, &configuration)?;
         Ok(Policy {
+            archivable,
             config: checkout_config(&config),
             attributes,
             actions,
@@ -143,6 +144,7 @@ impl<'a> Checkout<'a> {
     pub fn repair(
         &self,
         root: &Path,
+        commit: &str,
         entries: &[Entry],
         policy: &Policy,
         lazy: bool,
@@ -157,6 +159,24 @@ impl<'a> Checkout<'a> {
             .map(|(entry, _)| entry)
             .collect();
         let mut matches = objects::hash_private_files(root, self.data, &regular)?.into_iter();
+        // A partial clone's archive would fetch each absent blob on its own.
+        let converted: Vec<_> = entries
+            .iter()
+            .zip(policy.actions.iter().zip(&policy.archivable))
+            .filter(|(entry, (action, archivable))| {
+                matches!(action, Action::VerifyConverted | Action::VerifyAutoBinary)
+                    && **archivable
+                    && matches!(entry.kind, Kind::File { .. })
+                    && !lazy
+                    && std::fs::symlink_metadata(self.data.join(&entry.path)).is_ok()
+            })
+            .map(|(entry, _)| entry.path.as_path())
+            .collect();
+        let mut converted_verdicts: std::collections::HashMap<&Path, bool> = converted
+            .iter()
+            .copied()
+            .zip(self.converted(commit, &converted)?)
+            .collect();
         let mut symlink_objects = None;
         let mut attributes = Vec::new();
         let mut files = Vec::new();
@@ -174,6 +194,9 @@ impl<'a> Checkout<'a> {
                     }
                     verdict.is_some()
                 }
+                (Action::VerifyConverted, Kind::File { .. }) => converted_verdicts
+                    .remove(entry.path.as_path())
+                    .unwrap_or(false),
                 (Action::VerifyClone, Kind::Symlink)
                 | (Action::VerifyAutoBinary, Kind::File { .. }) => {
                     if symlink_objects.is_none() {
@@ -185,8 +208,13 @@ impl<'a> Checkout<'a> {
                         .as_mut()
                         .expect("opened object stream")
                         .compare(self.data, entry)?;
-                    comparison.equal
-                        && (*action != Action::VerifyAutoBinary || comparison.contains_nul)
+                    let raw = comparison.equal
+                        && (*action != Action::VerifyAutoBinary || comparison.contains_nul);
+                    // Text under automatic conversion: compare Git's bytes instead.
+                    let converted = converted_verdicts
+                        .remove(entry.path.as_path())
+                        .unwrap_or(false);
+                    raw || converted
                 }
                 _ => false,
             };
@@ -224,6 +252,34 @@ impl<'a> Checkout<'a> {
             attributes.len() + files.len()
         ));
         Ok(certified)
+    }
+
+    /// Whether each private file holds exactly the bytes Git's checkout would
+    /// write there, as `git archive` writes them under this configuration.
+    fn converted(&self, commit: &str, paths: &[&Path]) -> Result<Vec<bool>> {
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut command = self.command();
+        command.args(["archive", "--format=tar", commit]);
+        // Name few paths literally; otherwise stream the whole tree, which also
+        // keeps the command line short.
+        let literal: usize = paths.iter().map(|path| path.as_os_str().len() + 12).sum();
+        if literal < 8192 {
+            command.arg("--");
+            for path in paths {
+                let mut spec = std::ffi::OsString::from(":(literal)");
+                spec.push(path.as_os_str());
+                command.arg(spec);
+            }
+        }
+        let verdicts = crate::archive::compare(command, self.data, paths)?;
+        crate::trace(&format!(
+            "converted verification: {} of {} files equal Git's checkout bytes",
+            verdicts.iter().filter(|equal| **equal).count(),
+            verdicts.len()
+        ));
+        Ok(verdicts)
     }
 
     /// Replace the staged index with one recording the verified files' stat data.
@@ -271,6 +327,9 @@ enum Action {
     /// still convert, so whether the file counts as unchanged is Git's call.
     VerifyClone,
     VerifyAutoBinary,
+    /// Checkout converts this file. A clone is kept only if its bytes equal
+    /// what Git writes, read from `git archive`; Git judges it unchanged.
+    VerifyConverted,
     GitWrite,
 }
 
@@ -278,6 +337,9 @@ pub struct Policy {
     config: Vec<u8>,
     attributes: Vec<u8>,
     actions: Vec<Action>,
+    /// Per entry: `git archive` writes it as checkout does (no `export-subst`
+    /// or `export-ignore`), so its archived bytes can certify a clone.
+    archivable: Vec<bool>,
     /// Whether Twig recreates symlinks itself. Otherwise Git writes each one:
     /// as a plain file holding the target under core.symlinks=false, and as a
     /// file or directory symlink of Git's choosing on Windows.
@@ -300,13 +362,15 @@ struct Attributes {
     eol: Option<Vec<u8>>,
     legacy_crlf: bool,
     builtin_conversion: bool,
+    /// `export-subst` or `export-ignore`: archives differ from checkouts.
+    archive_differs: bool,
 }
 
 fn parse_attributes(
     entries: &[Entry],
     bytes: &[u8],
     configuration: &Configuration,
-) -> Result<Vec<Action>> {
+) -> Result<(Vec<Action>, Vec<bool>)> {
     ensure!(
         bytes.is_empty() || bytes.last() == Some(&0),
         "unterminated Git attributes"
@@ -348,13 +412,18 @@ fn parse_attributes(
                 )
             }
             b"ident" | b"working-tree-encoding" => attribute.builtin_conversion = true,
+            b"export-subst" | b"export-ignore" => attribute.archive_differs = true,
             b"text" => attribute.text = Some(row[2].to_vec()),
             b"eol" => attribute.eol = Some(row[2].to_vec()),
             b"crlf" => attribute.legacy_crlf = true,
             _ => {}
         }
     }
-    Ok(entries
+    let archivable = attributes
+        .iter()
+        .map(|attrs| !attrs.archive_differs)
+        .collect();
+    let actions = entries
         .iter()
         .zip(attributes)
         .map(|(entry, attrs)| {
@@ -372,11 +441,14 @@ fn parse_attributes(
                 Action::VerifyClone
             } else if attrs.auto_binary(configuration) {
                 Action::VerifyAutoBinary
+            } else if matches!(entry.kind, Kind::File { .. }) && !attrs.archive_differs {
+                Action::VerifyConverted
             } else {
                 Action::GitWrite
             }
         })
-        .collect())
+        .collect();
+    Ok((actions, archivable))
 }
 
 impl Attributes {
@@ -524,27 +596,39 @@ mod tests {
             );
         }
         assert_eq!(
-            parse_attributes(&entries, b"", &config)?,
+            parse_attributes(&entries, b"", &config)?.0,
             vec![Action::VerifySettled]
         );
         assert_eq!(
-            parse_attributes(&entries, b"file\0text\0unset\0", &config)?,
+            parse_attributes(&entries, b"file\0text\0unset\0", &config)?.0,
             vec![Action::VerifySettled]
         );
         // Cleaning converts CRLF here: raw bytes certify, Git decides "unchanged".
         let input = Configuration::parse(b"core.autocrlf\ninput\0")?;
         assert_eq!(
-            parse_attributes(&entries, b"", &input)?,
+            parse_attributes(&entries, b"", &input)?.0,
             vec![Action::VerifyClone]
         );
         assert_eq!(
-            parse_attributes(&entries, b"file\0text\0auto\0file\0eol\0lf\0", &config)?,
+            parse_attributes(&entries, b"file\0text\0auto\0file\0eol\0lf\0", &config)?.0,
             vec![Action::VerifyClone]
         );
         assert_eq!(
-            parse_attributes(&entries, b"file\0text\0unset\0file\0eol\0crlf\0", &config)?,
-            vec![Action::GitWrite]
+            parse_attributes(&entries, b"file\0text\0unset\0file\0eol\0crlf\0", &config)?.0,
+            vec![Action::VerifyConverted]
         );
+        // Archives expand or drop these paths; they are no oracle for checkout.
+        for attribute in ["export-subst", "export-ignore"] {
+            assert_eq!(
+                parse_attributes(
+                    &entries,
+                    format!("file\0eol\0crlf\0file\0{attribute}\0set\0").as_bytes(),
+                    &config
+                )?
+                .0,
+                vec![Action::GitWrite]
+            );
+        }
         assert!(parse_attributes(&entries, b"other\0text\0auto\0", &config).is_err());
         assert!(parse_attributes(&entries, b"file\0text\0auto", &config).is_err());
         Ok(())

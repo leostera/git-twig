@@ -479,6 +479,84 @@ fn auto_crlf_keeps_verified_nul_blobs_but_still_converts_text() -> Result<()> {
     Ok(())
 }
 
+/// Git for Windows converts every text file by default. Donor files checked out
+/// under the same conversion hold exactly the bytes Git writes; those are
+/// shared, while a stale donor file and paths an archive cannot vouch for are
+/// written by Git.
+#[test]
+fn converted_donor_bytes_are_shared_when_they_equal_git_checkout() -> Result<()> {
+    type Config = &'static [(&'static str, &'static str)];
+    let cases: [(&str, Config, &str); 5] = [
+        ("autocrlf", &[("core.autocrlf", "true")], ""),
+        ("text eol=crlf", &[], "*.txt text eol=crlf\n"),
+        ("legacy crlf", &[("core.eol", "crlf")], "*.txt crlf\n"),
+        ("ident", &[], "*.txt ident\n"),
+        ("encoding", &[], "*.txt working-tree-encoding=UTF-16LE\n"),
+    ];
+    for (name, config, attributes) in cases {
+        eprintln!("converted case: {name}");
+        let f = Fixture::new()?;
+        for (key, value) in config {
+            git(&f.source, &["config", key, value])?;
+        }
+        let attributes = format!("{attributes}subst.txt export-subst\n");
+        fs::write(f.source.join(".gitattributes"), &attributes)?;
+        fs::create_dir(f.source.join("tree"))?;
+        for path in ["a.txt", "tree/b.txt", "tree/stale.txt"] {
+            fs::write(f.source.join(path), "$Id$\nfirst\nsecond\n")?;
+        }
+        fs::write(f.source.join("subst.txt"), "$Format:%H$\n")?;
+        git(&f.source, &["add", "."])?;
+        git(&f.source, &["commit", "-m", "converted"])?;
+        // Check the donor out through the same conversion, as a clone would be.
+        let tracked = [
+            ".gitattributes",
+            ".gitignore",
+            "a.txt",
+            "tree/b.txt",
+            "tree/stale.txt",
+            "subst.txt",
+            "hello.txt",
+        ];
+        for path in tracked {
+            fs::remove_file(f.source.join(path))?;
+        }
+        git(&f.source, &["checkout", "--", "."])?;
+        let converted = fs::read(f.source.join("a.txt"))?;
+        fs::write(f.source.join("tree/stale.txt"), "$Id$\nfirst\nsecond\n")?;
+        let output = compare_stock(&f, &tracked, true)?;
+        let trace = String::from_utf8_lossy(&output.stderr);
+        if cow_available(&f)? {
+            // Archived: every converted file but subst.txt, which archives
+            // expand. autocrlf converts all six others; the attributes, the
+            // four *.txt files. stale.txt is unconverted, so it differs from
+            // Git's bytes unless the conversion round-trips it unchanged.
+            let candidates = if name == "autocrlf" { 6 } else { 4 };
+            let stale = usize::from(
+                fs::read(f.root.join("stock/tree/stale.txt"))? != b"$Id$\nfirst\nsecond\n",
+            );
+            assert!(
+                trace.contains(&format!(
+                    "converted verification: {} of {candidates} files equal Git's checkout bytes",
+                    candidates - stale
+                )),
+                "{trace}"
+            );
+            assert!(
+                trace.contains(&format!(
+                    "checkout: {} verified file clones, {} Git-written paths",
+                    tracked.len() - 1 - stale,
+                    1 + stale
+                )),
+                "{trace}"
+            );
+        }
+        fs::write(f.destination().join("a.txt"), "private\n")?;
+        assert_eq!(fs::read(f.source.join("a.txt"))?, converted);
+    }
+    Ok(())
+}
+
 #[test]
 fn forced_text_does_not_get_the_auto_binary_exemption() -> Result<()> {
     let f = Fixture::new()?;

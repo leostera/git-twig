@@ -1,5 +1,6 @@
 //! Native CoW materialization with Git-owned linked-worktree bookkeeping.
 mod adopt;
+mod archive;
 mod checkout;
 #[cfg(target_os = "macos")]
 mod compact;
@@ -245,7 +246,7 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
     #[cfg(not(target_os = "macos"))]
     let _ = directories;
     let verification_started = std::time::Instant::now();
-    let certified = checkout.repair(&root, &entries, &policy, lazy)?;
+    let certified = checkout.repair(&root, &commit, &entries, &policy, lazy)?;
     checkout.record(&commit, &entries, &certified)?;
     trace(&format!(
         "native preparation: snapshot {:.3}s; raw verification/repair {:.3}s; total {:.3}s",

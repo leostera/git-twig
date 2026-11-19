@@ -17,6 +17,9 @@ describe changes from this baseline after they are implemented and verified.
   sharing. Files open for writing or mapped are skipped.
 - Windows CI on NTFS and a ReFS Dev Drive with native cloning required, and
   a Windows `.zip` in each release with its SHA-256.
+- Converted files are shared: under `core.autocrlf=true` (the Git for Windows
+  default), `eol=crlf`, `ident` or `working-tree-encoding`, a donor file is kept
+  when it equals the bytes `git archive` produces for it. See RFD0028.
 - `core.symlinks=false` repositories no longer fall back: Git writes symlink
   entries as plain files while every other file stays shared.
 

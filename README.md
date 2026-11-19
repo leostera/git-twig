@@ -29,7 +29,7 @@ git -C main twig list
 ```
 
 Version 0.5.0 can reuse matching files from nearby worktrees for other revisions
-too. Git writes changed, new or converted files.
+too. Git writes changed or new files, and converted files whose bytes differ.
 Short help works outside a checkout: `git twig -h` or `git twig new --help`.
 
 For coding agents: `git twig skill` prints the bundled skill. Give those
@@ -133,7 +133,10 @@ Checkout policy coverage below is separate from filesystem capability.
 Version 0.4.0 supports common LF policies such as `text=auto eol=lf`.
 They compare private clones to raw target blobs and let Git write exceptional
 files, retaining sharing for the rest. Version 0.5.0 also chooses a donor
-across revisions and lets Git write builtin ident/encoding exceptions. External
+across revisions and lets Git write builtin ident/encoding exceptions. Unreleased
+builds also share converted files (`core.autocrlf=true`, `eol=crlf`, `ident`,
+`working-tree-encoding`) when the donor holds exactly the bytes Git writes,
+read from `git archive`. External
 filters and sparse checkout still delegate. Submodules are Git-written empty
 directories, never copied or recursively initialized from a donor.
 See the [changelog](CHANGELOG.md) for release details.

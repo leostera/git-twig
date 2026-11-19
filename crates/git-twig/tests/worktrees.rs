@@ -1353,8 +1353,7 @@ fn concurrent_creators_do_not_overwrite_each_other() -> Result<()> {
     let f = Fixture::new()?;
     // This is a native registrar guarantee. Stock Git can reuse a concurrent
     // creator's empty directory; delegated operations retain Git's semantics.
-    #[cfg(target_os = "linux")]
-    if !linux_reflinks_available(&f)? {
+    if !cow_available(&f)? {
         return Ok(());
     }
     let a = f.source.clone();
