@@ -182,13 +182,14 @@ impl Fixture {
             Err(error) => Err(error.into()),
         }
     }
+    /// Nothing Twig-named may remain beside checkouts after a command.
     fn assert_no_sibling_stages(&self) -> Result<()> {
         for entry in fs::read_dir(&self.root)? {
+            let name = entry?.file_name();
+            let name = name.to_string_lossy();
             assert!(
-                !entry?
-                    .file_name()
-                    .to_string_lossy()
-                    .starts_with(".git-twig-stage-")
+                !name.starts_with(".git-twig-") && !name.starts_with(".twig"),
+                "{name}"
             );
         }
         Ok(())

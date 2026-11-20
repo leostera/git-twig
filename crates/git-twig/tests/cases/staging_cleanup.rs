@@ -169,3 +169,74 @@ mod immutable {
         Ok(())
     }
 }
+
+/// The checkout inherits the destination's group and ACLs because Twig
+/// creates the destination itself, as Git would, and moves it into staging.
+/// No Twig-named directory appears beside it, even briefly.
+#[test]
+fn the_destination_itself_carries_inherited_metadata_into_staging() -> Result<()> {
+    let f = Fixture::new()?;
+    let output = checked(
+        command(env!("CARGO_BIN_EXE_git-twig"), &f.source)
+            .env("TWIG_TRACE", "1")
+            .args(["new", "-b", "feature", "../feature", "HEAD"])
+            .output()?,
+    )?;
+    native(&output);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let traced = format!("destination metadata: {}", f.destination().display());
+    assert!(stderr.contains(&traced), "{stderr}");
+    f.assert_no_sibling_stages()?;
+    clean(&f.destination())
+}
+
+/// Inheritable ACL entries on the destination's parent reach Twig's checkout
+/// exactly as they reach one Git creates.
+#[cfg(target_os = "macos")]
+#[test]
+fn inherited_acl_entries_match_git() -> Result<()> {
+    let f = Fixture::new()?;
+    fs::create_dir_all(f.source.join("tree"))?;
+    fs::write(f.source.join("tree/file"), "data")?;
+    git(&f.source, &["add", "."])?;
+    git(&f.source, &["commit", "-m", "tree"])?;
+    let parent = f.root.join("shared");
+    fs::create_dir(&parent)?;
+    checked(
+        command("chmod", &f.root)
+            .args([
+                "+a",
+                "everyone allow read,list,search,file_inherit,directory_inherit",
+            ])
+            .arg(&parent)
+            .output()?,
+    )?;
+    native(&checked(f.twig(&[
+        "new",
+        "-b",
+        "feature",
+        "../shared/twig",
+        "HEAD",
+    ])?)?);
+    git(
+        &f.source,
+        &["worktree", "add", "--detach", "../shared/stock"],
+    )?;
+    let acl = |path: PathBuf| -> Result<String> {
+        let listing = checked(command("ls", &f.root).arg("-led").arg(&path).output()?)?;
+        Ok(String::from_utf8(listing.stdout)?
+            .lines()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join("\n"))
+    };
+    for name in ["", "tree", "tree/file"] {
+        let ours = acl(parent.join("twig").join(name))?;
+        assert!(ours.contains("inherited"), "{name}: {ours}");
+        assert_eq!(ours, acl(parent.join("stock").join(name))?, "{name}");
+    }
+    assert!(
+        fs::read_dir(&parent)?.all(|e| !e.unwrap().file_name().to_string_lossy().starts_with("."))
+    );
+    Ok(())
+}

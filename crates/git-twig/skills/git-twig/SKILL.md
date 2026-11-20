@@ -255,4 +255,6 @@ create removes only its own staging, as does SIGINT, SIGTERM or SIGHUP before
 registration. Other failed or interrupted attempts retain diagnostic state;
 inspect `git twig list` and the reported staging paths, since a partial
 worktree may already be registered. Do not retry into it or delete it automatically.
-Older sibling staging folders are not swept or deleted by new commands.
+Older releases created `.git-twig-stage-*` folders beside checkouts; new commands
+neither create nor sweep them. Adoption keeps a `.twig/` folder beside the main
+clone only after a failure that needs manual recovery; report it, do not delete it.

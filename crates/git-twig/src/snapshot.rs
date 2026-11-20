@@ -53,6 +53,13 @@ pub fn materialize(
             entry.kind,
         )?;
     }
+    // A directory clone keeps every donor file's own ACL, while a new file, or
+    // a clone of one, takes the ACL its directory passes on, as Git's files do.
+    // Staging inherited any such ACL from the destination's parent.
+    #[cfg(target_os = "macos")]
+    let per_file = native::has_acl(data)?;
+    #[cfg(target_os = "macos")]
+    let mut directories = 0;
     // Never snapshot the repository root: .git and unrelated root trees stay out entirely.
     for (name, node) in &tree.children {
         let source = root.join(name);
@@ -71,10 +78,16 @@ pub fn materialize(
                     clone_planned_files(&files, modes)?;
                     continue; // The file walker already establishes types and checkout modes.
                 }
-                #[cfg(not(any(target_os = "linux", windows)))]
+                #[cfg(target_os = "macos")]
                 {
+                    if per_file {
+                        let mut files = Vec::new();
+                        plan_tracked_directory(&source, &target, directory, &mut files)?;
+                        clone_planned_files(&files, modes)?;
+                        continue;
+                    }
                     native::clone_path(&source, &target)?;
-                    let _ = directory;
+                    directories += 1;
                 }
             }
             Node::File { .. } => native::clone_path(&source, &target)?,
@@ -87,19 +100,15 @@ pub fn materialize(
             modes,
         )?;
     }
-    Ok(if cfg!(target_os = "macos") {
-        tree.children
-            .values()
-            .filter(|node| matches!(node, Node::Directory(_)))
-            .count()
-    } else {
-        0
-    })
+    #[cfg(target_os = "macos")]
+    return Ok(directories);
+    #[cfg(not(target_os = "macos"))]
+    Ok(0)
 }
 
 // Linux FICLONE works on regular files, not directory trees. Walk only the
 // committed inventory so ignored files and unrelated special files are never opened.
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
 struct PlannedFile {
     source: std::path::PathBuf,
     target: std::path::PathBuf,
@@ -108,7 +117,7 @@ struct PlannedFile {
 
 /// Create the tracked directories and symlinks, and list the regular files to
 /// clone. Directories exist before any file worker starts.
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
 fn plan_tracked_directory(
     source: &Path,
     target: &Path,
@@ -145,7 +154,7 @@ fn plan_tracked_directory(
 
 /// Reflink each planned file. One clone is a handful of system calls with no
 /// shared state, so a large inventory is split across a few threads.
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
 fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Result<()> {
     let clone = |file: &PlannedFile| -> Result<()> {
         let kind = Node::File {
@@ -153,6 +162,15 @@ fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Resu
         };
         if still_tracked_kind(&file.source, &kind)? {
             native::clone_path(&file.source, &file.target)?;
+            // clonefile also copies the donor's mode, BSD flags and extended
+            // attributes; Linux and Windows clones start with none of them.
+            #[cfg(target_os = "macos")]
+            {
+                let metadata = fs::symlink_metadata(&file.target)?;
+                native::discard_donor_metadata(&file.target, &metadata)?;
+                modes.ensure(&file.target, &metadata, file.executable)?;
+            }
+            #[cfg(not(target_os = "macos"))]
             modes.apply(&file.target, file.executable)?;
         }
         Ok(())
@@ -184,7 +202,7 @@ fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Resu
     })
 }
 
-#[cfg(any(target_os = "linux", windows, test))]
+#[cfg(any(target_os = "macos", target_os = "linux", windows, test))]
 fn clone_worker_count(files: usize, cpus: usize) -> usize {
     if files >= 1024 { cpus.clamp(1, 8) } else { 1 }
 }

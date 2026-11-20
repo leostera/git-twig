@@ -69,6 +69,28 @@ pub fn canonicalize(path: impl AsRef<Path>) -> Result<std::path::PathBuf> {
     Ok(std::fs::canonicalize(path)?)
 }
 
+/// Whether `path` carries an extended ACL, without following a symlink.
+#[cfg(target_os = "macos")]
+pub fn has_acl(path: &Path) -> Result<bool> {
+    unsafe extern "C" {
+        fn acl_get_link_np(path: *const libc::c_char, kind: libc::c_int) -> *mut libc::c_void;
+        fn acl_free(object: *mut libc::c_void) -> libc::c_int;
+    }
+    const ACL_TYPE_EXTENDED: libc::c_int = 0x0000_0100;
+    let c_path = c_path(path)?;
+    // SAFETY: a live NUL-terminated path; the returned ACL is freed below.
+    let acl = unsafe { acl_get_link_np(c_path.as_ptr(), ACL_TYPE_EXTENDED) };
+    if acl.is_null() {
+        let error = std::io::Error::last_os_error();
+        // ENOENT here means the path has no ACL.
+        anyhow::ensure!(error.raw_os_error() == Some(libc::ENOENT), error);
+        return Ok(false);
+    }
+    // SAFETY: acl came from acl_get_link_np and is freed exactly once.
+    unsafe { acl_free(acl) };
+    Ok(true)
+}
+
 /// clonefile(2) copies BSD flags and extended attributes along with the bytes.
 /// A Git checkout has neither, and immutable flags would also make the private
 /// clone impossible to chmod, replace or remove.

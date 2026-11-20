@@ -16,7 +16,8 @@ pub(super) struct Staging {
 }
 
 impl Staging {
-    pub fn create(&mut self, root: &Path, destination_parent: &Path) -> Result<PathBuf> {
+    pub fn create(&mut self, root: &Path, destination: &Path) -> Result<PathBuf> {
+        let destination_parent = destination.parent().context("destination has no parent")?;
         let parent = crate::state_directory(root)?.join("staging");
         fs::create_dir_all(&parent)?;
         #[cfg(unix)]
@@ -40,15 +41,20 @@ impl Staging {
             container.display()
         ));
 
-        // Inherit the destination's GID, SGID and default ACL before relocating.
-        // Creating the checkout directly under .git would inherit different metadata.
-        let bootstrap = create_private(destination_parent)?;
-        self.bootstrap = Some(bootstrap.clone());
+        // Inherit the destination's GID, SGID and ACLs: create the destination
+        // itself, exactly where Git would, then move it into staging. Created
+        // under .git it would inherit different metadata, and a scratch name
+        // beside it would leave Twig names beside the checkouts.
+        private_directory()
+            .create(destination)
+            .with_context(|| format!("cannot create destination {}", destination.display()))?;
+        self.bootstrap = Some(destination.to_path_buf());
+        crate::trace(&format!("destination metadata: {}", destination.display()));
         let checkout = container.join("checkout");
-        fs::rename(&bootstrap, &checkout).with_context(|| {
+        fs::rename(destination, &checkout).with_context(|| {
             format!(
-                "cannot relocate empty staging {} into {}",
-                bootstrap.display(),
+                "cannot move empty destination {} into staging {}",
+                destination.display(),
                 checkout.display()
             )
         })?;
@@ -57,12 +63,16 @@ impl Staging {
     }
 
     pub fn cleanup(&mut self, outcome: &str) {
-        for path in self
-            .bootstrap
-            .take()
-            .into_iter()
-            .chain(self.container.take())
+        // Still at the destination: only the empty directory created above.
+        if let Some(destination) = self.bootstrap.take()
+            && let Err(error) = fs::remove_dir(&destination)
         {
+            eprintln!(
+                "git-twig: {outcome}; could not remove empty destination {}: {error}",
+                destination.display()
+            );
+        }
+        if let Some(path) = self.container.take() {
             let result = fs::symlink_metadata(&path)
                 .map_err(anyhow::Error::from)
                 .and_then(|metadata| {
@@ -78,22 +88,26 @@ impl Staging {
     }
 }
 
+fn private_directory() -> fs::DirBuilder {
+    #[cfg_attr(not(unix), allow(unused_mut))]
+    let mut builder = fs::DirBuilder::new();
+    // Windows directories inherit the ACL of the directory they live in.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder
+}
+
 fn create_private(parent: &Path) -> Result<PathBuf> {
     for _ in 0..1000 {
         let path = parent.join(format!(
-            ".git-twig-stage-{}-{}",
+            "stage-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
-        #[cfg_attr(not(unix), allow(unused_mut))]
-        let mut builder = fs::DirBuilder::new();
-        // Windows directories inherit the ACL of the Git directory they live in.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        match builder.create(&path) {
+        match private_directory().create(&path) {
             Ok(()) => return Ok(path),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(error.into()),

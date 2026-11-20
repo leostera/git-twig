@@ -786,17 +786,6 @@ fn cohort(
             Filesystem::IsolatedImage | Filesystem::CaseSensitiveImage
         ) {
             warmup_cleanup_recovered = remove_owned_warmup(&warmup_seed, mount)?;
-            // Only benchmark-owned warmup staging paths on this disposable image are removed.
-            for entry in fs::read_dir(mount)? {
-                let entry = entry?;
-                if entry
-                    .file_name()
-                    .to_string_lossy()
-                    .starts_with(".git-twig-stage-")
-                {
-                    fs::remove_dir_all(entry.path())?;
-                }
-            }
         }
     }
     let before = filesystem.snapshot(mount)?;

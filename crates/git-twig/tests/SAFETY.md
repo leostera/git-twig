@@ -41,6 +41,11 @@ prefix, branch names Git refuses before registration, and (ignored, attaches a
 disk image) exFAT companion files. `cases/donor_coverage.rs` covers a separate
 Git directory, where Git lists the main checkout at a path holding no checkout.
 
+`cases/staging_cleanup.rs` also requires creation to inherit metadata through the
+destination directory itself, leaving no Twig-named entry beside checkouts, and
+on macOS requires Twig's directories and files to carry the same inherited ACL
+entries as a checkout Git creates beside it.
+
 `cases/index_freshness.rs` requires the installed index to record inode and size
 for root, nested, symlink and Git-rewritten entries, and same-size dirty donor
 bytes to be rewritten rather than recorded as clean.

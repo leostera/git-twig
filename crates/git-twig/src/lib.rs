@@ -242,7 +242,7 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
     }
     #[cfg(windows)]
     windows::ensure_block_cloning(&parent)?;
-    let stage = staging.create(&root, &parent)?;
+    let stage = staging.create(&root, &destination)?;
     let data = stage.join("data");
     fs::create_dir(&data)?;
     let index = stage.join("index");
