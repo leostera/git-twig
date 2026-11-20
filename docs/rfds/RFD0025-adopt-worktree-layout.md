@@ -57,7 +57,10 @@ force unlock, copy secrets or replace existing destinations. Refuse cross-device
 relocation before writes; copying-and-deleting is not a safe fallback.
 
 For in-place restructuring (`repo` becomes `repo/main`), first park selected
-checkouts in a fresh private sibling recovery directory, deepest-first. Park the
+checkouts in a fresh private recovery directory, `.twig/adopt-<id>` beside the
+main clone, deepest-first. It cannot live in Git metadata, because the main clone
+and its Git directory are parked in it. `.twig/` must be a directory, not a link,
+owned by the user and writable by no one else. Park the
 main clone last. Create the container only after its old contents are parked,
 then install the main clone and linked checkouts using atomic, no-replace directory
 renames. Git `worktree repair` owns updating Git links after relocation, including
@@ -68,7 +71,11 @@ On an ordinary error, reverse completed renames and empty owned-directory
 creation, then repair original registrations. Never overwrite a newly occupied
 path during rollback. If interruption or rollback prevents completion, retain
 all files and the recovery journal and report its location. No automatic retry or
-sweep; SIGKILL cannot promise rollback. Journals are retained even on success.
+sweep; SIGKILL cannot promise rollback. After success, or an ordinary error whose
+rollback restored the original layout, nothing needs recovering: remove the
+journal, its directory and `.twig/` if empty (amended; journals were first kept
+even on success, which left a folder per run beside the checkouts). Anything
+unexpected inside keeps the directory.
 
 ## Sharing and compatibility
 

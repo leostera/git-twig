@@ -549,7 +549,8 @@ mod layout {
             println!("Worktrees directory: {:?}", self.root);
             for record in &self.repository.records {
                 if let Some(m) = self.moves.iter().find(|m| m.from == record.path) {
-                    println!("  {:?} -> {:?}", m.from, m.to);
+                    let to = m.to.strip_prefix(&self.root).unwrap_or(&m.to);
+                    println!("  {:?} -> {:?}", m.from, to);
                 } else {
                     println!("  {:?} (unchanged)", record.path);
                 }
@@ -600,10 +601,6 @@ mod layout {
         );
         let repository = Repository::read(cwd)?;
         let selected = selected_path(cwd, &request.target)?;
-        println!("Found {} registered worktree(s):", repository.records.len());
-        for record in &repository.records {
-            println!("  {:?}", record.path);
-        }
         let saved = saved_root(cwd)?;
         let root = match request.root.or(saved) {
             Some(path) => cwd.join(path),
@@ -626,8 +623,15 @@ mod layout {
             }
         };
         let plan = Plan::build(repository, root, selected.as_deref())?;
-        plan.show(request.sharing);
-        preview_sharing(&plan, request.sharing)?;
+        // --yes without --compact only moves on macOS; preview nothing else.
+        let planned =
+            if cfg!(target_os = "macos") && request.yes && request.sharing == Sharing::Automatic {
+                Sharing::MoveOnly
+            } else {
+                request.sharing
+            };
+        plan.show(planned);
+        preview_sharing(&plan, planned)?;
         if request.dry_run {
             println!("Dry run: no directories, configuration or files changed.");
             if request.sharing == Sharing::Automatic
@@ -676,12 +680,9 @@ mod layout {
             );
         }
         #[cfg(target_os = "macos")]
-        let mut compaction = if sharing == Sharing::Compact {
+        let compaction = if sharing == Sharing::Compact {
             Some(crate::compact::Session::new(
-                plan.repository
-                    .main
-                    .parent()
-                    .context("main has no parent")?,
+                &plan.repository.main,
                 OfflineConsent { _confirmed: () },
             )?)
         } else {
@@ -710,12 +711,14 @@ mod layout {
         ).context("layout was adopted, but saving the root failed; worktree files remain at the displayed destinations")?;
         println!("Layout adopted. Saved worktrees directory: {:?}", plan.root);
         #[cfg(target_os = "macos")]
-        if let Some(session) = compaction.as_mut() {
+        if let Some(mut session) = compaction {
+            session.relocated(&plan.repository.main, &plan.main_destination);
             for target in plan.targets(true) {
                 session
                     .compact(&plan.main_destination, &target)?
                     .show(&target, false);
             }
+            session.finish();
         }
         if sharing != Sharing::MoveOnly {
             share_after_move(&plan);
@@ -835,8 +838,10 @@ mod layout {
                 .main
                 .parent()
                 .context("main checkout has no parent")?;
-            let path = parent.join(format!(
-                ".twig-adopt-{}-{}",
+            // Checkouts, main and its Git directory included, are parked here
+            // while they move, so it cannot live inside any of them.
+            let path = crate::state_folder(parent)?.join(format!(
+                "adopt-{}-{}",
                 std::process::id(),
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
             ));
@@ -850,12 +855,37 @@ mod layout {
             for m in &plan.moves {
                 transaction.record("plan", &m.from, &m.to)?;
             }
-            println!(
-                "Recovery journal retained at {:?}",
+            crate::trace(&format!(
+                "adoption journal: {:?} (kept only if recovery needs it)",
                 transaction.path.join("journal.nul")
-            );
-            transaction.probe_rename().with_context(|| format!("atomic no-overwrite directory renames are unsupported; no worktrees moved; journal retained at {:?}", transaction.path))?;
+            ));
+            if let Err(error) = transaction.probe_rename() {
+                transaction.discard(&["probe-from", "probe-occupied", "probe-vacant"]);
+                bail!(
+                    "atomic no-overwrite directory renames are unsupported; no worktrees moved: {error:#}"
+                );
+            }
             Ok(transaction)
+        }
+        /// Remove this journal once nothing needs recovering. Only the named
+        /// empty probe directories and the journal itself are deleted; anything
+        /// else left inside keeps the folder, with a warning.
+        fn discard(self, probes: &[&str]) {
+            let Self { journal, path, .. } = self;
+            drop(journal);
+            for probe in probes {
+                let _ = fs::remove_dir(path.join(probe));
+            }
+            let result =
+                fs::remove_file(path.join("journal.nul")).and_then(|()| fs::remove_dir(&path));
+            if let Err(error) = result {
+                eprintln!("git-twig: kept adoption journal at {path:?}: {error}");
+                return;
+            }
+            if let Some(folder) = path.parent() {
+                // Other Twig processes may still use it.
+                let _ = fs::remove_dir(folder);
+            }
         }
         fn probe_rename(&mut self) -> Result<()> {
             let from = self.path.join("probe-from");
@@ -983,25 +1013,26 @@ mod layout {
             )?;
             Ok(())
         })();
-        if let Err(error) = result {
-            let recovery = transaction.rollback().and_then(|_| {
-                repair(
-                    &plan.repository.main,
-                    plan.repository.records.iter().map(|r| r.path.clone()),
-                )
-            });
-            match recovery {
-                Ok(()) => bail!(
-                    "adoption failed and original layout was restored: {error:#}; journal retained at {:?}",
-                    transaction.path
-                ),
-                Err(rollback) => bail!(
-                    "adoption failed: {error:#}; recovery incomplete: {rollback:#}; do not delete anything; recovery journal and parked files retained at {:?}",
-                    transaction.path
-                ),
+        let Err(error) = result else {
+            transaction.discard(&[]);
+            return Ok(());
+        };
+        let recovery = transaction.rollback().and_then(|_| {
+            repair(
+                &plan.repository.main,
+                plan.repository.records.iter().map(|r| r.path.clone()),
+            )
+        });
+        match recovery {
+            Ok(()) => {
+                transaction.discard(&[]);
+                bail!("adoption failed and original layout was restored: {error:#}")
             }
+            Err(rollback) => bail!(
+                "adoption failed: {error:#}; recovery incomplete: {rollback:#}; do not delete anything; recovery journal and parked files retained at {:?}",
+                transaction.path
+            ),
         }
-        Ok(())
     }
 
     /// Never use ordinary rename here: a destination appearing after preview

@@ -384,6 +384,38 @@ fn install(cwd: &Path, args: &[OsString], request: &AddRequest, prepared: Prepar
     Ok(code)
 }
 
+/// The one Twig folder beside checkouts, `<parent>/.twig`, for work that
+/// cannot live in Git metadata because it moves checkouts themselves. It must
+/// be a directory, not a link, that only this user can change: whoever can
+/// write to it could swap what Twig parks there.
+fn state_folder(parent: &Path) -> Result<PathBuf> {
+    let folder = parent.join(".twig");
+    #[cfg_attr(not(unix), allow(unused_mut))]
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    match builder.create(&folder) {
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        result => result.with_context(|| format!("cannot create {folder:?}"))?,
+    }
+    let metadata = fs::symlink_metadata(&folder)?;
+    ensure!(metadata.is_dir(), "{folder:?} is not a directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        // SAFETY: geteuid has no preconditions.
+        let user = unsafe { libc::geteuid() };
+        ensure!(
+            metadata.uid() == user && metadata.mode() & 0o022 == 0,
+            "{folder:?} must be owned by this user and writable by no one else"
+        );
+    }
+    Ok(folder)
+}
+
 fn state_directory(root: &Path) -> Result<PathBuf> {
     let common_dir = output_path(
         checked(git(root).args(["rev-parse", "--path-format=absolute", "--git-common-dir"]))?

@@ -27,7 +27,7 @@ independent reflink probe prevents silently testing fallback instead.
 | Windows paths and volumes match Git | Canonical fixture paths have no verbatim prefix; volume identity is stable; FILETIME conversion matches Git for Windows' index |
 | Disabled symlinks keep the rest shared | `core.symlinks=false` root and nested links are Git-written plain files beside a shared file, on every platform |
 | Converted clones equal Git's checkout | autocrlf, `eol=crlf`, legacy `crlf`, `ident`, `working-tree-encoding`: bytes and status match stock Git; a stale donor and an `export-subst` path are Git-written |
-| Windows moves undo on open files | A file held open in main blocks its move after a child moved; every move is undone, files and index unchanged, journal retained |
+| Windows moves undo on open files | A file held open in main blocks its move after a child moved; every move is undone, files and index unchanged, no journal kept for a restored layout |
 | Windows dedupe is locked, in place | Shares a 300,001-byte file keeping identity, attributes, last write time and index; skips files open for writing (target or donor), mapped writable with no open handle, reached through a junction, or hardlinked; writers still write their own file |
 
 `cases/partial_clones.rs` counts promisor fetches in Git's own event trace: none
@@ -74,6 +74,12 @@ are no elapsed-time assertions. Dependency scripts are never executed. These tes
 do not claim to fix or reproduce issue #5's two-minute slowdown.
 
 ## Existing-worktree adoption
+
+`cases/adopt_layout.rs` and `cases/adopt_compact.rs` require that successful
+adoption and compaction, and rollbacks that restored the layout, leave no `.twig`
+entry beside the checkouts and no compaction state under `.git/twigs/compact`.
+A `.twig` link or group-writable `.twig` folder is refused before anything moves,
+and a journal kept by an earlier failure survives a later adoption.
 
 `cases/adopt_linux.rs` compares current raw bytes, identities, modes, indexes and
 registration for inspection, preparation and in-place deduplication. It exercises

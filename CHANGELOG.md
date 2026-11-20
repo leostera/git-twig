@@ -64,6 +64,13 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- Adoption and compaction no longer leave a `.twig-adopt-*` or `.twig-compact-*`
+  folder beside the checkouts after every run. Compaction recovery lives in
+  `.git/twigs/compact`. Adoption parks checkouts in one `.twig/` folder beside
+  the main clone, because main and its Git directory move through it. Both are
+  removed once nothing needs recovering, and kept only after a failure.
+- `adopt` lists each checkout once, shows destinations relative to the root,
+  and no longer previews compaction for macOS `--yes` runs, which only move.
 - `git twig remove` deletes worktrees whose absolute paths exceed the system
   limit (1024 bytes on macOS). Git unregistered them, failed with "File name
   too long" and left the directory behind. Twig finishes deleting only the

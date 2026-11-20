@@ -35,17 +35,22 @@ fn compact(f: &Fixture, root: &Path, extra: &[&str]) -> Result<Output> {
     args.extend_from_slice(extra);
     f.twig(&args)
 }
+/// Compaction keeps recovery state under Git metadata, which moves with main.
+/// Nothing Twig-owned may appear beside the checkouts.
 fn recoveries(f: &Fixture) -> Result<Vec<PathBuf>> {
-    Ok(f.root
-        .read_dir()?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .as_encoded_bytes()
-                .starts_with(b".twig-compact-")
-        })
-        .map(|e| e.path())
-        .collect())
+    assert_eq!(
+        super::adopt_layout::twig_state(&f.root)?,
+        Vec::<PathBuf>::new()
+    );
+    let mut found = Vec::new();
+    for main in [f.source.clone(), f.root.join("managed/main")] {
+        match main.join(".git/twigs/compact").read_dir() {
+            Ok(entries) => found.extend(entries.filter_map(|e| e.ok()).map(|e| e.path())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(found)
 }
 #[derive(Debug, PartialEq, Eq)]
 struct Attributes {
@@ -203,16 +208,9 @@ fn offline_compaction_preserves_target_metadata_and_dirty_staged_bytes() -> Resu
     )?)?;
     assert_eq!(fs::read(adopted.join("hello.txt"))?, b"private write");
     assert_eq!(index(&adopted)?, before_index);
-    // Verified retired originals no longer pin their old extents.
-    for recovery in recoveries(&f)? {
-        assert!(recovery.join("journal.nul").is_file());
-        assert!(!recovery.read_dir()?.any(|e| {
-            e.unwrap()
-                .file_name()
-                .as_encoded_bytes()
-                .starts_with(b"file-")
-        }));
-    }
+    // Verified retired originals no longer pin their old extents, and a
+    // completed compaction keeps no recovery state.
+    assert_eq!(recoveries(&f)?, Vec::<PathBuf>::new());
     Ok(())
 }
 
@@ -315,10 +313,13 @@ fn odd_names_resource_forks_hardlinks_and_symlinks_survive() -> Result<()> {
 fn inherited_recovery_acl_is_refused_before_worktrees_move() -> Result<()> {
     let f = Fixture::new()?;
     let target = peer(&f)?;
+    // Recovery state is created under Git metadata and inherits its ACL.
+    let state = f.source.join(".git/twigs");
+    fs::create_dir_all(&state)?;
     checked(
         command("chmod", &f.root)
             .args(["+a", "everyone allow read,file_inherit,directory_inherit"])
-            .arg(&f.root)
+            .arg(&state)
             .output()?,
     )?;
     let root = f.root.join("managed");

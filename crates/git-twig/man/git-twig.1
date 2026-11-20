@@ -31,7 +31,8 @@ confirm every move; --dry-run changes nothing. Noninteractive use requires --yes
 and an explicit or saved root. An optional target selects only that worktree.
 Preserves branches, index bytes and dirty, untracked and ignored files. Refuses
 cross-device moves, occupied destinations, locked registrations and submodule
-relocation. Git repairs links after moves. Recovery journals are retained.
+relocation. Git repairs links after moves. A recovery journal is kept only when
+a failure needs manual recovery.
 Coordinate editors and agents before moving: stored absolute paths are not updated.
 Linux then attempts safe in-place deduplication; --move-only disables sharing.
 macOS interactive adoption offers optional offline compaction. Save work and close

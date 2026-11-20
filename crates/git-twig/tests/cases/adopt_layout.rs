@@ -19,6 +19,16 @@ fn nested(f: &Fixture) -> Result<PathBuf> {
     )?;
     Ok(path)
 }
+/// Twig-owned entries beside checkouts. Adoption may use `.twig/` while it
+/// runs, and keeps it only when recovery needs it.
+pub(super) fn twig_state(directory: &Path) -> Result<Vec<PathBuf>> {
+    Ok(directory
+        .read_dir()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().as_encoded_bytes().starts_with(b".twig"))
+        .map(|e| e.path())
+        .collect())
+}
 fn apply(cwd: &Path, root: &Path, target: Option<&Path>) -> Result<Output> {
     let mut args = vec!["adopt", "--yes", "--worktrees-dir", root.to_str().unwrap()];
     if let Some(target) = target {
@@ -127,12 +137,7 @@ fn previews_and_missing_confirmation_do_not_write_layout_or_config() -> Result<(
     assert_eq!(config, fs::read(f.source.join(".git/config"))?);
     assert_eq!(before_index, index(&f.source)?);
     assert_eq!(before, files(&f.source)?);
-    assert!(!f.root.read_dir()?.any(|e| {
-        e.unwrap()
-            .file_name()
-            .as_encoded_bytes()
-            .starts_with(b".twig-adopt-")
-    }));
+    assert_eq!(twig_state(&f.root)?, Vec::<PathBuf>::new());
     Ok(())
 }
 
@@ -184,9 +189,18 @@ fn adopts_nested_worktrees_and_main_into_its_own_old_root_without_losing_state()
         String::from_utf8(saved.stdout)?.trim(),
         f.source.to_str().unwrap()
     );
+    let stdout = String::from_utf8_lossy(&output.stdout);
     if cfg!(target_os = "macos") {
-        assert!(String::from_utf8_lossy(&output.stdout).contains("sharing will remain unchanged"));
+        assert!(stdout.contains("sharing will remain unchanged"), "{stdout}");
+        // --yes alone only moves on macOS, so no compaction is previewed.
+        assert!(!stdout.contains("compaction"), "{stdout}");
     }
+    // Each checkout is listed once, in the plan. Only the nested checkout's
+    // path names `.claude`; Windows prints it with its own separators.
+    assert_eq!(stdout.matches(".claude").count(), 1, "{stdout}");
+    // A completed adoption leaves nothing beside the checkouts.
+    assert_eq!(twig_state(&f.root)?, Vec::<PathBuf>::new());
+    assert_eq!(twig_state(&f.source)?, Vec::<PathBuf>::new());
     // Git still sees the original staged/dirty distinction after its links move.
     let status = git(&target, &["status", "--porcelain"])?;
     assert!(String::from_utf8_lossy(&status.stdout).contains("MM hello.txt"));
@@ -400,11 +414,8 @@ exec "$TWIG_REAL_GIT" "$@"
     assert_eq!(files(&f.source)?, before);
     assert_eq!(index(&peer)?, before_index);
     git(&peer, &["status", "--porcelain"])?;
-    assert!(
-        f.root
-            .read_dir()?
-            .any(|e| e.unwrap().path().join("journal.nul").is_file())
-    );
+    // Restored layouts need no recovery, so no journal is kept.
+    assert_eq!(twig_state(&f.root)?, Vec::<PathBuf>::new());
     Ok(())
 }
 
@@ -438,10 +449,55 @@ fn open_files_block_relocation_and_roll_back() -> Result<()> {
     assert_eq!(files(&f.source)?, before);
     assert_eq!(index(&peer)?, before_index);
     git(&peer, &["status", "--porcelain"])?;
+    // Restored layouts need no recovery, so no journal is kept.
+    assert_eq!(twig_state(&f.root)?, Vec::<PathBuf>::new());
+    Ok(())
+}
+
+/// `.twig/` beside main holds parked checkouts while they move, so a link or
+/// a folder others can write to is refused before anything moves, and a
+/// journal kept by an earlier failure is left alone.
+#[cfg(unix)]
+#[test]
+fn the_twig_folder_must_be_private_and_keeps_other_journals() -> Result<()> {
+    let f = Fixture::new()?;
+    if !relocation_available_or_refusal_verified(&f)? {
+        return Ok(());
+    }
+    nested(&f)?;
+    let before = files(&f.source)?;
+    let root = f.root.join("managed");
+    let folder = f.root.join(".twig");
+    let elsewhere = f.root.join("elsewhere");
+    fs::create_dir(&elsewhere)?;
+    std::os::unix::fs::symlink(&elsewhere, &folder)?;
+    let output = apply(&f.source, &root, None)?;
+    assert!(!output.status.success(), "{output:?}");
     assert!(
-        f.root
-            .read_dir()?
-            .any(|e| e.unwrap().path().join("journal.nul").is_file())
+        String::from_utf8_lossy(&output.stderr).contains("not a directory"),
+        "{output:?}"
     );
+    assert_eq!(fs::read_dir(&elsewhere)?.count(), 0);
+    fs::remove_file(&folder)?;
+
+    fs::create_dir(&folder)?;
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o770))?;
+    let output = apply(&f.source, &root, None)?;
+    assert!(!output.status.success(), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("writable by no one else"),
+        "{output:?}"
+    );
+    assert_eq!(files(&f.source)?, before);
+    assert!(!root.exists());
+
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o700))?;
+    let kept = folder.join("adopt-1-1");
+    fs::create_dir(&kept)?;
+    fs::write(kept.join("journal.nul"), "earlier failure")?;
+    checked(apply(&f.source, &root, None)?)?;
+    assert!(root.join("main/.git").is_dir());
+    assert_eq!(fs::read_dir(&folder)?.count(), 1);
+    assert_eq!(fs::read(kept.join("journal.nul"))?, b"earlier failure");
     Ok(())
 }

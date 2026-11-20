@@ -41,13 +41,19 @@ unstaged and conflicted index entries survive unchanged. Replaced inodes and cti
 necessarily differ; Git may refresh its stat cache on the next status.
 
 For APFS, after explicit consent create a private mode-0700 recovery directory
-beside the original clone, verifying owner/mode and refusing inherited ACLs before
+under the common Git directory, `twigs/compact/<id>` (amended; first beside the
+original clone), verifying owner/mode and refusing inherited ACLs before
 writing candidate bytes. Probe native clone/swap and busy-unlink capabilities
 using only fresh owned probe files before moving anything. Unsupported primitives
 refuse compaction, not silently copy full data or unlink busy originals. Keep a
 durable NUL journal identifying target, temporary path, original/candidate inode
 identities and each prepare/swap/retire boundary. Recovery data is never a global
-workspace registry or an automatic cleanup sweep.
+workspace registry or an automatic cleanup sweep. Git metadata on another
+filesystem refuses compaction before anything moves. Every operation uses open
+directory handles, so the directory keeps working when adoption moves main and
+its Git directory. Once every target is compacted, or the capability probe fails
+before any move, remove it: originals are retired by then, and refused candidates
+were never installed.
 
 After relocation and Git-link repair, open each current donor/target through
 no-symlink directory-descriptor walks. Verify same device, distinct single-linked

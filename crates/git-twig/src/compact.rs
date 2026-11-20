@@ -137,21 +137,19 @@ impl Summary {
         crate::trace(&format!("compaction skip {path:?}: {error:#}"));
     }
     pub fn show(&self, target: &Path, preview: bool) {
-        println!(
-            "{} target={target:?} matched_files={} matching_logical_bytes={} compacted_files={} compacted_logical_bytes={} skipped_files={}; exclusive physical savings NOT measured",
-            if preview {
-                "compaction-preview"
-            } else {
-                "compaction-result"
-            },
-            self.matched_files,
-            self.matched_bytes,
-            self.compacted_files,
-            self.compacted_bytes,
-            self.skipped.values().sum::<u64>()
-        );
+        if preview {
+            println!(
+                "compaction-preview {target:?}: {} matching files ({} bytes) can become clones of main",
+                self.matched_files, self.matched_bytes
+            );
+        } else {
+            println!(
+                "compaction-result {target:?}: {} of {} matching files ({} bytes) are now clones of main",
+                self.compacted_files, self.matched_files, self.compacted_bytes
+            );
+        }
         for (reason, count) in &self.skipped {
-            println!("  compaction-skip count={count} reason={reason:?}");
+            println!("  skipped {count}: {reason}");
         }
     }
 }
@@ -208,9 +206,22 @@ pub(super) struct Session {
     sequence: u64,
 }
 impl Session {
-    pub fn new(parent: &Path, _consent: crate::adopt::OfflineConsent) -> Result<Self> {
+    /// Recovery state lives under the common Git directory, in `twigs/compact`.
+    /// Everything is done through open directory handles, so it keeps working
+    /// when adoption moves main and its Git directory.
+    pub fn new(main: &Path, _consent: crate::adopt::OfflineConsent) -> Result<Self> {
+        let parent = crate::state_directory(main)?.join("compact");
+        match fs::DirBuilder::new().mode(0o700).create(&parent) {
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            result => result?,
+        }
+        ensure!(
+            fs::metadata(&parent)?.dev() == fs::metadata(main)?.dev(),
+            "offline compaction needs Git metadata on the worktrees' filesystem; no worktrees moved"
+        );
+        let parent = parent.as_path();
         let path = parent.join(format!(
-            ".twig-compact-{}-{}",
+            "{}-{}",
             std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
@@ -244,12 +255,39 @@ impl Session {
             recovery_stat.ino(),
         )?;
         directory(parent)?.sync_all()?;
-        println!(
-            "Compaction recovery journal retained at {:?}",
+        crate::trace(&format!(
+            "compaction journal: {:?} (kept only if recovery needs it)",
             session.path.join("journal.nul")
-        );
-        session.probe().with_context(|| format!("offline compaction primitives unavailable; no worktrees moved; recovery directory {:?}", session.path))?;
+        ));
+        if let Err(error) = session.probe() {
+            // Only probe files exist yet, and no worktree has moved.
+            session.finish();
+            bail!("offline compaction primitives unavailable; no worktrees moved: {error:#}");
+        }
         Ok(session)
+    }
+    /// Adoption moved main, and the Git directory holding this session with it.
+    pub fn relocated(&mut self, from: &Path, to: &Path) {
+        if let Ok(rest) = self.path.strip_prefix(from) {
+            self.path = to.join(rest);
+        }
+    }
+    /// Discard recovery state once every target is compacted. Originals are
+    /// retired by then; what remains is the journal and candidates refused
+    /// before installation, which were never part of any worktree.
+    pub fn finish(self) {
+        let Self {
+            path,
+            directory,
+            journal,
+            ..
+        } = self;
+        drop((directory, journal));
+        if let Err(error) = fs::remove_dir_all(&path) {
+            eprintln!("git-twig: kept compaction state at {path:?}: {error}");
+        } else if let Some(parent) = path.parent() {
+            let _ = fs::remove_dir(parent);
+        }
     }
     fn record(
         &mut self,

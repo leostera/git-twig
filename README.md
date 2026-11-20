@@ -68,7 +68,8 @@ repository. Pass a worktree path to adopt just that checkout. After adoption,
 
 Coordinate active agents/editors first: their stored paths are not updated.
 Moves preserve branches and staged, dirty, untracked and ignored files, stay on
-one filesystem and never overwrite destinations. Recovery journals are retained.
+one filesystem and never overwrite destinations. A recovery journal is kept only
+when a failure needs manual recovery.
 Layout moves also require a successful atomic no-overwrite directory-rename
 probe; unsupported drivers are refused before any worktree moves. Submodule
 relocation is not yet supported. Windows cannot move a directory while a
