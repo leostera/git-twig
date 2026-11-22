@@ -58,7 +58,9 @@ export async function execute(
       if (!child.pid) return;
       // Windows has no process groups; end the whole tree instead.
       if (process.platform === "win32") {
-        spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+        spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+          stdio: "ignore",
+        });
         return;
       }
       try {

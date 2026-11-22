@@ -87,7 +87,9 @@ test("real inputs require pinned unique repositories and explicit protocol count
     parseInputs({ schemaVersion: 1, repositories: [expected.input] }),
   ).toEqual([expected.input]);
   const drive = { ...expected.input, path: "C:\\twig-bench\\inputs\\repo" };
-  expect(parseInputs({ schemaVersion: 1, repositories: [drive] })).toEqual([drive]);
+  expect(parseInputs({ schemaVersion: 1, repositories: [drive] })).toEqual([
+    drive,
+  ]);
   for (const input of [
     { ...expected.input, revision: "HEAD" },
     { ...expected.input, worktrees: 0 },
@@ -151,7 +153,12 @@ test("ReFS Dev Drives compare file-data clusters, not volume free space", () => 
   raw.filesystem = "windows-dev-drive";
   expected.filesystem = "windows-dev-drive";
   for (const cohort of raw.cohorts) {
-    for (const key of ["before", "afterCreate", "afterStatus", "afterPrivateWrites"] as const)
+    for (const key of [
+      "before",
+      "afterCreate",
+      "afterStatus",
+      "afterPrivateWrites",
+    ] as const)
       Object.assign(cohort[key]!, { fileDataBytes: 8192 });
     Object.assign(cohort, {
       fileDataGrowthAfterStatusBytes: cohort.backend === "git" ? 12288 : 4096,
@@ -160,7 +167,13 @@ test("ReFS Dev Drives compare file-data clusters, not volume free space", () => 
     cohort.afterStatus!.stable = false;
   }
   const rows = summarizeReal(parseReal(raw, expected));
-  expect(rows.map((r) => [r.backend, r.allocationMedianBytes, r.allocationComparable])).toEqual([
+  expect(
+    rows.map((r) => [
+      r.backend,
+      r.allocationMedianBytes,
+      r.allocationComparable,
+    ]),
+  ).toEqual([
     ["git", 12288, true],
     ["twig", 4096, true],
   ]);

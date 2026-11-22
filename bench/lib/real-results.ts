@@ -234,7 +234,8 @@ export function parseReal(
       }
       if (refs)
         invariant(
-          Number.isSafeInteger(space.fileDataBytes) && Number(space.fileDataBytes) > 0,
+          Number.isSafeInteger(space.fileDataBytes) &&
+            Number(space.fileDataBytes) > 0,
           "Missing ReFS file-data clusters",
         );
       allocationStable &&= space.stable;

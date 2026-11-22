@@ -25,7 +25,9 @@ const executable = (name: string) =>
 /// The candidate must be the CLI this checkout's workspace version names.
 export async function expectedVersion(): Promise<string> {
   const manifest = await readFile(join(root, "Cargo.toml"), "utf8");
-  const version = /^\[workspace\.package\][^[]*?^version = "([^"]+)"/ms.exec(manifest)?.[1];
+  const version = /^\[workspace\.package\][^[]*?^version = "([^"]+)"/ms.exec(
+    manifest,
+  )?.[1];
   invariant(version, "Workspace version not found in Cargo.toml");
   return "git-twig " + version;
 }
@@ -112,7 +114,10 @@ export async function run(args: string[]) {
     encoding: "utf8",
   }).trim();
   const wanted = await expectedVersion();
-  invariant(version === wanted, `This campaign requires ${wanted}, not ${version}`);
+  invariant(
+    version === wanted,
+    `This campaign requires ${wanted}, not ${version}`,
+  );
   for (const input of inputs) {
     git(["-C", input.path, "cat-file", "-e", input.revision + "^{commit}"]);
   }
