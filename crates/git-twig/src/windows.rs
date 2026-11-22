@@ -2,7 +2,9 @@
 //!
 //! Block cloning (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) is the Windows counterpart of
 //! APFS clonefile and Linux FICLONE. Only ReFS, including Dev Drive, supports it.
-//! It shares clusters between two files on one volume or fails: it never copies.
+//! It shares clusters between two files on one volume or fails. A file shorter
+//! than one cluster has no whole cluster to share, so Twig writes its bytes as
+//! Git would; cloning it would only give both files private clusters.
 use anyhow::{Context, Result, bail, ensure};
 use std::{
     ffi::c_void,
@@ -94,6 +96,12 @@ pub fn clone_handle(source: &File, destination: &Path) -> Result<()> {
     if length == 0 {
         return Ok(());
     }
+    // ReFS keeps a small file Git writes resident in its metadata. Cloning one
+    // would move the donor and the copy into a private cluster each and share
+    // nothing, since a final partial cluster is never shared.
+    if length < u64::from(integrity.ClusterSizeInBytes) {
+        return copy_bytes(source, &destination, length);
+    }
     // The target must already be as long as the source.
     set_length(&destination, length)?;
     duplicate(source, &destination, length, integrity.ClusterSizeInBytes)
@@ -107,6 +115,9 @@ pub fn clone_handle(source: &File, destination: &Path) -> Result<()> {
 /// change either file between that comparison and this call, and Windows
 /// refuses such a handle while another process holds the file open for
 /// writing or has it mapped writable.
+///
+/// Returns the bytes shared; a pair shorter than one cluster has none and is
+/// left as it is.
 pub fn dedupe_locked(donor: &File, target: &File, length: u64) -> Result<u64> {
     ensure!(length > 0, "nothing to share");
     ensure!(
@@ -114,6 +125,13 @@ pub fn dedupe_locked(donor: &File, target: &File, length: u64) -> Result<u64> {
         "volume does not support block cloning (ReFS or a Dev Drive is required)"
     );
     let (a, b) = (donor.metadata()?, target.metadata()?);
+    if length < u64::from(integrity(donor)?.ClusterSizeInBytes) {
+        ensure!(
+            a.file_size() == length && b.file_size() == length,
+            "length changed"
+        );
+        return Ok(0);
+    }
     const SETTINGS: u32 = FILE_ATTRIBUTE_SPARSE_FILE;
     ensure!(
         a.file_size() == length && b.file_size() == length,
@@ -146,6 +164,21 @@ pub fn dedupe_locked(donor: &File, target: &File, length: u64) -> Result<u64> {
         "target timestamp changed while sharing"
     );
     Ok(length)
+}
+
+/// Write the first `length` bytes of `source` into the new, empty destination.
+fn copy_bytes(source: &File, destination: &File, length: u64) -> Result<()> {
+    use std::{io::Write, os::windows::fs::FileExt};
+    let mut bytes = vec![0; usize::try_from(length)?];
+    let mut read = 0;
+    while read < bytes.len() {
+        let count = source.seek_read(&mut bytes[read..], read as u64)?;
+        ensure!(count > 0, "source shrank while it was copied");
+        read += count;
+    }
+    let mut destination = destination;
+    destination.write_all(&bytes)?;
+    Ok(())
 }
 
 fn integrity(file: &File) -> Result<FSCTL_GET_INTEGRITY_INFORMATION_BUFFER> {
@@ -585,6 +618,73 @@ mod tests {
                 assert!(!copy.exists());
             }
         }
+        Ok(())
+    }
+
+    /// Whether ReFS gave the file clusters of its own. A small file Git writes
+    /// stays resident in the volume's metadata and has none.
+    fn has_extents(path: &Path) -> Result<bool> {
+        use windows_sys::Win32::{
+            Foundation::{ERROR_HANDLE_EOF, ERROR_MORE_DATA},
+            System::Ioctl::FSCTL_GET_RETRIEVAL_POINTERS,
+        };
+        let file = File::open(path)?;
+        let starting_vcn = 0i64;
+        // RETRIEVAL_POINTERS_BUFFER: extent count, starting VCN, one extent.
+        let mut output = [0u64; 4];
+        match control(
+            &file,
+            FSCTL_GET_RETRIEVAL_POINTERS,
+            Some(&starting_vcn),
+            Some(&mut output),
+        ) {
+            Ok(()) => Ok(output[0] as u32 > 0),
+            Err(error) => match error
+                .downcast_ref::<std::io::Error>()
+                .and_then(std::io::Error::raw_os_error)
+            {
+                Some(code) if code == ERROR_HANDLE_EOF as i32 => Ok(false),
+                Some(code) if code == ERROR_MORE_DATA as i32 => Ok(true),
+                _ => Err(error),
+            },
+        }
+    }
+
+    #[test]
+    fn files_smaller_than_a_cluster_stay_resident() -> Result<()> {
+        let root = fixture("resident")?;
+        let source = root.join("small");
+        let bytes = b"a tracked file shorter than one cluster\n".repeat(2);
+        fs::write(&source, &bytes)?;
+        if !supports_block_cloning(&File::open(&source)?)? {
+            assert!(std::env::var_os("TWIG_TEST_REQUIRE_NATIVE").is_none());
+            return Ok(());
+        }
+        assert!(!has_extents(&source)?, "ReFS keeps small files resident");
+        let copy = root.join("copy");
+        clone_file(&source, &copy)?;
+        assert_eq!(fs::read(&copy)?, bytes);
+        // Cloning cannot share a partial cluster, so it would only move the
+        // donor and the copy into private clusters Git never allocates.
+        assert!(
+            !has_extents(&source)?,
+            "the donor lost its resident storage"
+        );
+        assert!(
+            !has_extents(&copy)?,
+            "the copy took a cluster it cannot share"
+        );
+
+        let twin = root.join("twin");
+        fs::write(&twin, &bytes)?;
+        let shared = dedupe_locked(
+            &File::open(&source)?,
+            &File::open(&twin)?,
+            bytes.len() as u64,
+        )?;
+        assert_eq!(shared, 0, "a partial cluster is never shared");
+        assert!(!has_extents(&source)? && !has_extents(&twin)?);
+        assert_eq!(fs::read(&twin)?, bytes);
         Ok(())
     }
 

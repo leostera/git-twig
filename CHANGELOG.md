@@ -15,6 +15,10 @@ describe changes from this baseline after they are implemented and verified.
 - Windows: `git twig adopt` layout moves, `--prepare` and in-place `--dedupe`
   on ReFS, holding both files locked against writers from comparison until
   sharing. Files open for writing or mapped are skipped.
+- Windows: files smaller than one cluster are written rather than block
+  cloned, because cloning cannot share a partial cluster and would move both
+  the donor and the copy out of ReFS's resident storage into clusters of
+  their own. In-place dedupe leaves such files alone.
 - Windows CI on NTFS and a ReFS Dev Drive with native cloning required, and
   a Windows `.zip` in each release with its SHA-256.
 - Converted files are shared: under `core.autocrlf=true` (the Git for Windows

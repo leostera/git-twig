@@ -39,6 +39,15 @@ and fixed line-ending assumptions in the repository's own checks.
   padding would change its bytes. Each cloned file therefore costs one private
   cluster (4 KiB on a Dev Drive), and files smaller than a cluster save
   nothing. On rust-lang/cargo, 59% of a worktree's data clusters are shared.
+- **Files smaller than a cluster are written, not cloned** (amended; found by
+  the 0.6 benchmark). ReFS keeps a small file Git writes resident in its
+  metadata, with no cluster of its own: on a 4 KiB Dev Drive, files of 100 and
+  1,000 bytes had no extents. Cloning one gave both the donor and the copy a
+  private cluster and shared nothing, so a 6-file starter repository used 264
+  KiB of clusters per ten worktrees where Git used none. `clone_handle` now
+  writes the bytes of a file shorter than one cluster from the held donor
+  handle, and in-place dedupe leaves such a pair alone. Verification is the
+  same as for clones.
 - **Verification is unchanged.** Every clone is hashed against its blob before
   installation, by the same parallel raw hashing as on Unix.
 - **Early delegation.** Twig asks the destination volume for
