@@ -151,8 +151,8 @@ jobs:
           (cd "$work" && npm pack --silent "$package")
           git config --global user.name ci; git config --global user.email ci@example.invalid
           for mode in scripts no-scripts; do
-            prefix="$work/prefix-$mode"; flags=(); [ $mode = no-scripts ] && flags=(--ignore-scripts)
-            npm install -g --prefix "$prefix" "${flags[@]}" "$work/git-twig-$version.tgz"
+            prefix="$work/prefix-$mode"; flag=--foreground-scripts; [ $mode = no-scripts ] && flag=--ignore-scripts
+            npm install -g --prefix "$prefix" "$flag" "$work/git-twig-$version.tgz"
             bin="$prefix/bin"; [ "$RUNNER_OS" = Windows ] && bin="$prefix"
             PATH="$bin:$PATH" git twig --version | grep -Fx "git-twig $version"
             # After its first run (or the install script) the command is the
