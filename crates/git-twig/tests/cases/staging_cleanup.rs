@@ -170,11 +170,12 @@ mod immutable {
     }
 }
 
-/// The checkout inherits the destination's group and ACLs because Twig
-/// creates the destination itself, as Git would, and moves it into staging.
-/// No Twig-named directory appears beside it, even briefly.
+/// The checkout inherits the destination's group and ACLs through a private
+/// directory in `.twig/` beside it, never through the destination itself,
+/// which a concurrent creation could hand to Git while it is empty. Nothing
+/// is left beside the checkouts afterwards.
 #[test]
-fn the_destination_itself_carries_inherited_metadata_into_staging() -> Result<()> {
+fn destination_metadata_is_inherited_through_the_twig_folder() -> Result<()> {
     let f = Fixture::new()?;
     let output = checked(
         command(env!("CARGO_BIN_EXE_git-twig"), &f.source)
@@ -184,7 +185,10 @@ fn the_destination_itself_carries_inherited_metadata_into_staging() -> Result<()
     )?;
     native(&output);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let traced = format!("destination metadata: {}", f.destination().display());
+    let traced = format!(
+        "destination metadata: inherited through {}",
+        f.root.join(".twig").join("stage-").display()
+    );
     assert!(stderr.contains(&traced), "{stderr}");
     f.assert_no_sibling_stages()?;
     clean(&f.destination())

@@ -69,9 +69,9 @@ describe changes from this baseline after they are implemented and verified.
 - macOS: files in a new worktree inherit ACL entries from the destination's
   parent, as files Git writes do. Whole-directory clones kept each donor file's
   own ACL; staging that inherited an ACL now clones file by file.
-- `git twig new` no longer creates a `.git-twig-stage-*` folder beside the
-  destination. It creates the destination itself to inherit its group and ACLs,
-  as before, and moves it into `.git/twigs/staging`.
+- `git twig new` briefly creates its metadata bootstrap in `.twig/` beside the
+  destination, instead of a `.git-twig-stage-*` folder, and removes `.twig/`
+  once it is empty.
 - Adoption and compaction no longer leave a `.twig-adopt-*` or `.twig-compact-*`
   folder beside the checkouts after every run. Compaction recovery lives in
   `.git/twigs/compact`. Adoption parks checkouts in one `.twig/` folder beside

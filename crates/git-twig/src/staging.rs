@@ -41,36 +41,41 @@ impl Staging {
             container.display()
         ));
 
-        // Inherit the destination's GID, SGID and ACLs: create the destination
-        // itself, exactly where Git would, then move it into staging. Created
-        // under .git it would inherit different metadata, and a scratch name
-        // beside it would leave Twig names beside the checkouts.
-        private_directory()
-            .create(destination)
-            .with_context(|| format!("cannot create destination {}", destination.display()))?;
-        self.bootstrap = Some(destination.to_path_buf());
-        crate::trace(&format!("destination metadata: {}", destination.display()));
+        // Inherit the destination's GID, SGID and ACLs before relocating:
+        // created under .git the checkout would inherit different metadata.
+        // Never create the destination itself here. While it exists empty, a
+        // concurrent creation hands it to Git, which accepts an empty directory,
+        // and both would own it. `.twig/` passes on what the destination's
+        // parent passes on, like every level below it.
+        let bootstrap = bootstrap(destination_parent)?;
+        self.bootstrap = Some(bootstrap.clone());
+        crate::trace(&format!(
+            "destination metadata: inherited through {}",
+            bootstrap.display()
+        ));
         let checkout = container.join("checkout");
-        fs::rename(destination, &checkout).with_context(|| {
+        fs::rename(&bootstrap, &checkout).with_context(|| {
             format!(
-                "cannot move empty destination {} into staging {}",
-                destination.display(),
+                "cannot relocate empty staging {} into {}",
+                bootstrap.display(),
                 checkout.display()
             )
         })?;
         self.bootstrap = None;
+        remove_empty_folder(&bootstrap);
         Ok(checkout)
     }
 
     pub fn cleanup(&mut self, outcome: &str) {
-        // Still at the destination: only the empty directory created above.
-        if let Some(destination) = self.bootstrap.take()
-            && let Err(error) = fs::remove_dir(&destination)
-        {
-            eprintln!(
-                "git-twig: {outcome}; could not remove empty destination {}: {error}",
-                destination.display()
-            );
+        // Never relocated: only the empty directory created above.
+        if let Some(bootstrap) = self.bootstrap.take() {
+            if let Err(error) = fs::remove_dir(&bootstrap) {
+                eprintln!(
+                    "git-twig: {outcome}; could not remove empty staging {}: {error}",
+                    bootstrap.display()
+                );
+            }
+            remove_empty_folder(&bootstrap);
         }
         if let Some(path) = self.container.take() {
             let result = fs::symlink_metadata(&path)
@@ -100,6 +105,42 @@ fn private_directory() -> fs::DirBuilder {
     builder
 }
 
+/// An empty private directory in `.twig/` beside the destination. Another
+/// Twig may remove an empty `.twig/` meanwhile; recreate it and try again.
+fn bootstrap(destination_parent: &Path) -> Result<PathBuf> {
+    #[cfg(unix)]
+    const EINVAL: i32 = libc::EINVAL;
+    #[cfg(not(unix))]
+    const EINVAL: i32 = 0;
+    // Creating in a directory another process is removing fails with ENOENT,
+    // EINVAL on APFS, or access denied while Windows has its delete pending.
+    let vanished = |error: &anyhow::Error| {
+        error.chain().any(|cause| {
+            cause.downcast_ref::<std::io::Error>().is_some_and(|error| {
+                error.kind() == std::io::ErrorKind::NotFound
+                    || (cfg!(unix) && error.raw_os_error() == Some(EINVAL))
+                    || (cfg!(windows) && error.kind() == std::io::ErrorKind::PermissionDenied)
+            })
+        })
+    };
+    for _ in 0..64 {
+        match crate::state_folder(destination_parent).and_then(|folder| create_private(&folder)) {
+            Err(error) if vanished(&error) => {
+                std::thread::sleep(std::time::Duration::from_millis(2))
+            }
+            result => return result,
+        }
+    }
+    anyhow::bail!("{:?} kept disappearing", destination_parent.join(".twig"))
+}
+
+/// Remove `.twig/` once nothing is left in it. Others may still use it.
+fn remove_empty_folder(bootstrap: &Path) {
+    if let Some(folder) = bootstrap.parent() {
+        let _ = fs::remove_dir(folder);
+    }
+}
+
 fn create_private(parent: &Path) -> Result<PathBuf> {
     for _ in 0..1000 {
         let path = parent.join(format!(
@@ -110,7 +151,11 @@ fn create_private(parent: &Path) -> Result<PathBuf> {
         match private_directory().create(&path) {
             Ok(()) => return Ok(path),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error.into()),
+            Err(error) => {
+                return Err(
+                    anyhow::Error::from(error).context(format!("cannot create {}", path.display()))
+                );
+            }
         }
     }
     anyhow::bail!("unable to allocate private staging directory")

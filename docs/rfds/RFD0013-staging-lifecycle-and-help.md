@@ -25,9 +25,12 @@ use Git before registration rather than fail halfway through a cross-device move
 
 A private, empty bootstrap directory briefly inherits the destination parent's
 GID, setgid and default ACL, then moves into the operation's private Git-metadata
-container before materialization. The bootstrap is the destination itself,
-created exclusively where Git would create it (amended; it was first a scratch
-`.git-twig-stage-*` sibling, a Twig name beside the checkouts). On macOS, staging
+container before materialization. The bootstrap is a private `stage-<id>`
+directory in `.twig/` beside the destination, removed with `.twig/` once empty
+(amended; it was first a `.git-twig-stage-*` sibling). `.twig/` passes on what
+the destination's parent passes on, as every level below it does. The bootstrap
+is never the destination itself: while that exists empty, a concurrent creation
+hands it to Git, which accepts an empty directory, and both would own it. On macOS, staging
 that inherited an ACL clones file by file rather than whole directories, since a
 directory clone keeps each donor file's own ACL while a new file inherits its
 directory's, as Git's files do. This preserves the Linux inheritance contract
@@ -40,10 +43,9 @@ Success cleanup is explicit, not an unconditional Drop action. Hook failure and
 post-registration failure retain their worktree and staging. Cleanup failure
 warns with the retained path but does not turn an otherwise successful creation
 into a failure. No glob, stale-PID sweep, or deletion of a previously existing
-path is part of cleanup. A crash during bootstrap relocation can retain the empty
-destination directory, which a later creation hands to Git, as it does any
-existing destination; diagnostics/cleanup remain scoped to the current invocation
-when it is still running.
+path is part of cleanup. A crash during bootstrap relocation can retain an empty
+`.twig/stage-<id>` beside the destination; diagnostics/cleanup remain scoped to
+the current invocation when it is still running.
 
 Native creation defers SIGHUP, SIGINT and SIGTERM until registration starts.
 Bulk APFS directory clones ([RFD0010](RFD0010-bulk-directory-cloning.md)) briefly
