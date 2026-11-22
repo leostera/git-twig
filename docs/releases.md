@@ -20,11 +20,13 @@ Before publishing:
 6. Review GitHub Actions permissions and the generated formula.
 
 With owner approval, push a vVERSION tag matching Cargo.toml. The release workflow
-builds macOS arm64/x86_64 and Linux x86_64 archives (including `git-twig.1`),
-SHA256SUMS and a stable Homebrew formula. It generates notes/formula from the immutable tag, creates a GitHub release with
+builds macOS arm64/x86_64 and Linux x86_64 archives (including `git-twig.1`), a
+Windows x86_64 zip (`git-twig.exe`, no man page), SHA256SUMS and a stable Homebrew
+formula for macOS and Linux. It generates notes/formula from the immutable tag, creates a GitHub release with
 that tag, and commits Formula/git-twig.rb on current main. SHA256SUMS uses archive
-basenames so a download can be checked with `sha256sum -c SHA256SUMS`. Native CoW supports macOS/APFS and Linux on Btrfs or
-reflink-enabled XFS; unsupported filesystems delegate to Git. macOS binaries are
+basenames so a download can be checked with `sha256sum -c SHA256SUMS`. Native CoW supports macOS/APFS, Linux on Btrfs or
+reflink-enabled XFS, and Windows ReFS including Dev Drive; unsupported filesystems
+(including NTFS) delegate to Git. The Windows binary is not Authenticode-signed. macOS binaries are
 not signed/notarized yet. Linux prebuilt archives are built on Ubuntu 22.04
 (glibc 2.35); source installs remain available for other libc environments.
 
