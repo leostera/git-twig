@@ -18,7 +18,7 @@ export function parseInputs(value: unknown): RealInput[] {
       "Invalid repository label",
     );
     invariant(
-      typeof r.path === "string" && r.path.startsWith("/"),
+      typeof r.path === "string" && /^(\/|[A-Za-z]:[\\/])/.test(r.path),
       "Input path must be absolute",
     );
     invariant(
@@ -194,7 +194,8 @@ export function parseReal(
       operations.length === input.worktrees,
       "Incomplete operation inventory",
     );
-    const host = expected.filesystem === "host";
+    const host = expected.filesystem === "host",
+      refs = expected.filesystem === "windows-dev-drive";
     let allocationStable = !host;
     for (const key of [
       "before",
@@ -231,9 +232,20 @@ export function parseReal(
             "False allocation stability",
           );
       }
+      if (refs)
+        invariant(
+          Number.isSafeInteger(space.fileDataBytes) && Number(space.fileDataBytes) > 0,
+          "Missing ReFS file-data clusters",
+        );
       allocationStable &&= space.stable;
     }
-    const allocation = c.growthAfterStatusBytes;
+    // ReFS volume free space moves on its own even after a flush. The clusters
+    // files reference are exact, so they are the comparison; volume samples stay
+    // as raw observations.
+    if (refs) allocationStable = true;
+    const allocation = refs
+      ? c.fileDataGrowthAfterStatusBytes
+      : c.growthAfterStatusBytes;
     invariant(
       host
         ? allocation === null

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { open } from "node:fs/promises";
 
 // A fresh environment per child: no inherited Git context or injected configuration.
@@ -12,7 +12,7 @@ export function environment(
   return {
     ...env,
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
     GIT_ATTR_NOSYSTEM: "1",
     GIT_TEMPLATE_DIR: "",
     GIT_DEFAULT_HASH: "sha1",
@@ -56,6 +56,11 @@ export async function execute(
     let escalation: Promise<void> | undefined;
     function kill(signal: NodeJS.Signals) {
       if (!child.pid) return;
+      // Windows has no process groups; end the whole tree instead.
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+        return;
+      }
       try {
         process.kill(-child.pid, signal);
       } catch (error) {

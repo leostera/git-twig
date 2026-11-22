@@ -86,10 +86,13 @@ test("real inputs require pinned unique repositories and explicit protocol count
   expect(
     parseInputs({ schemaVersion: 1, repositories: [expected.input] }),
   ).toEqual([expected.input]);
+  const drive = { ...expected.input, path: "C:\\twig-bench\\inputs\\repo" };
+  expect(parseInputs({ schemaVersion: 1, repositories: [drive] })).toEqual([drive]);
   for (const input of [
     { ...expected.input, revision: "HEAD" },
     { ...expected.input, worktrees: 0 },
     { ...expected.input, path: "relative" },
+    { ...expected.input, path: "C:relative" },
     { ...expected.input, label: "../repo" },
   ])
     expect(() =>
@@ -142,4 +145,25 @@ test("real gate rejects wrong versions, missing rounds, corruption, fallback and
     mutation(raw);
     expect(() => parseReal(raw, expected)).toThrow();
   }
+});
+test("ReFS Dev Drives compare file-data clusters, not volume free space", () => {
+  const { raw, expected } = fixture();
+  raw.filesystem = "windows-dev-drive";
+  expected.filesystem = "windows-dev-drive";
+  for (const cohort of raw.cohorts) {
+    for (const key of ["before", "afterCreate", "afterStatus", "afterPrivateWrites"] as const)
+      Object.assign(cohort[key]!, { fileDataBytes: 8192 });
+    Object.assign(cohort, {
+      fileDataGrowthAfterStatusBytes: cohort.backend === "git" ? 12288 : 4096,
+    });
+    // ReFS free space keeps moving; a sample that never settled is expected.
+    cohort.afterStatus!.stable = false;
+  }
+  const rows = summarizeReal(parseReal(raw, expected));
+  expect(rows.map((r) => [r.backend, r.allocationMedianBytes, r.allocationComparable])).toEqual([
+    ["git", 12288, true],
+    ["twig", 4096, true],
+  ]);
+  delete (raw.cohorts[3]!.before as Record<string, unknown>).fileDataBytes;
+  expect(() => parseReal(raw, expected)).toThrow("file-data clusters");
 });

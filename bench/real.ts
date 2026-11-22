@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFile, statfs } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { delimiter, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { targets } from "./lib/config.ts";
 import { environment, execute } from "./lib/process.ts";
@@ -12,7 +12,23 @@ const host = {
   os: "darwin",
   workerFilesystem: "host",
 } as const;
-const available = [...targets, host];
+// Fresh expandable VHDX images formatted as ReFS Dev Drives. ReFS volume free
+// space moves on its own; space is compared by the clusters files reference.
+const windows = {
+  name: "windows-dev-drive",
+  os: "win32",
+  workerFilesystem: "windows-dev-drive",
+} as const;
+const available = [...targets, host, windows];
+const executable = (name: string) =>
+  process.platform === "win32" ? name + ".exe" : name;
+/// The candidate must be the CLI this checkout's workspace version names.
+export async function expectedVersion(): Promise<string> {
+  const manifest = await readFile(join(root, "Cargo.toml"), "utf8");
+  const version = /^\[workspace\.package\][^[]*?^version = "([^"]+)"/ms.exec(manifest)?.[1];
+  invariant(version, "Workspace version not found in Cargo.toml");
+  return "git-twig " + version;
+}
 const root = fileURLToPath(new URL("../", import.meta.url));
 function git(args: string[]) {
   return execFileSync("git", args, {
@@ -81,24 +97,22 @@ export async function run(args: string[]) {
     JSON.parse(await readFile(inputsFile, "utf8")),
   ).filter((i) => target !== host || i.hostTiming);
   invariant(inputs.length > 0, "No eligible inputs");
-  process.env.PATH = bin + ":" + process.env.PATH;
+  process.env.PATH = bin + delimiter + process.env.PATH;
   invariant(
     git(["status", "--porcelain"]) === "",
     "Commit the harness before measuring",
   );
   const commit = git(["rev-parse", "HEAD"]),
-    worker = join(bin, "twig-real-bench");
+    worker = join(bin, executable("twig-real-bench"));
   const tools = new Map<string, string>();
-  for (const file of [candidate, worker, join(bin, "git")])
+  for (const file of [candidate, worker, join(bin, executable("git"))])
     tools.set(file, await digest(file));
   const version = execFileSync(candidate, ["--version"], {
     env: environment(),
     encoding: "utf8",
   }).trim();
-  invariant(
-    version === "git-twig 0.5.0",
-    "This campaign requires the published v0.5.0 CLI",
-  );
+  const wanted = await expectedVersion();
+  invariant(version === wanted, `This campaign requires ${wanted}, not ${version}`);
   for (const input of inputs) {
     git(["-C", input.path, "cat-file", "-e", input.revision + "^{commit}"]);
   }
@@ -114,7 +128,10 @@ export async function run(args: string[]) {
     commit,
     dirty: false,
     candidate: { version, sourceCommit, sha256: tools.get(candidate) },
-    git: { version: git(["--version"]), sha256: tools.get(join(bin, "git")) },
+    git: {
+      version: git(["--version"]),
+      sha256: tools.get(join(bin, executable("git"))),
+    },
     worker: { sha256: tools.get(worker) },
     config: {
       target: target.name,
@@ -149,7 +166,7 @@ export async function run(args: string[]) {
       exitCode: number | null;
     }[],
     notes: [
-      "Published v0.5.0 vs frozen stock Git; release asset provenance is retained alongside this campaign. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.",
+      `${version} built from ${sourceCommit} vs frozen stock Git. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.`,
       "No retries, no automatic exclusion of errors, and no website changes. Unstable allocation observations remain raw data, not comparative allocation claims.",
       "Host timing and filesystem-image allocation are separate environments; never combine them into one cohort. Warm caches on shared hosts; background apps not stopped. No cold-cache, saturation or universal speed claim.",
       "Full independent raw-byte/mode/symlink verification, native-clone checks, source isolation and private writes are mandatory. Verification follows creation timing. Original sources are read-only; applications and dependency scripts are never executed.",
