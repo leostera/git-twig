@@ -21,6 +21,10 @@ describe changes from this baseline after they are implemented and verified.
   their own. In-place dedupe leaves such files alone.
 - Windows CI on NTFS and a ReFS Dev Drive with native cloning required, and
   a Windows `.zip` in each release with its SHA-256.
+- Windows install with Scoop: `scoop bucket add git-twig
+  https://github.com/leostera/git-twig`, then `scoop install git-twig/git-twig`.
+  The release binary links the C runtime statically, so it runs without the
+  Visual C++ Redistributable.
 - Converted files are shared: under `core.autocrlf=true` (the Git for Windows
   default), `eol=crlf`, `ident` or `working-tree-encoding`, a donor file is kept
   when it equals the bytes `git archive` produces for it. See RFD0028.

@@ -166,8 +166,9 @@ Do not alter the user's installed binary or PATH without separate approval.
 With owner approval, satisfy the GitHub release environment reviewer gate.
 Publication is not done while that job is waiting. The workflow should create a
 non-draft stable release with `--verify-tag --title "$GITHUB_REF_NAME"`, upload
-all three archives, SHA256SUMS and generated formula, then update current main's
-Formula/git-twig.rb without force-pushing.
+the three archives, the Windows zip, SHA256SUMS and generated formula, then
+update current main's Formula/git-twig.rb and bucket/git-twig.json (Scoop) without
+force-pushing.
 
 Do not manually create a second release if the workflow owns publication.
 Check release name, tagName, stable/latest status, asset inventory and tag commit.
@@ -190,6 +191,13 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew fetch --formula leostera/git-twig/git-twig
 ```
 Inspect/preserve any existing tap edits before updating it. Tap/fetch changes
 package-manager metadata/cache, not the installed CLI. Do not silently upgrade it.
+
+On Windows, confirm bucket/git-twig.json's URL and hash match the published zip,
+then install through an isolated Scoop (`install.ps1 -ScoopDir <temporary>`),
+`scoop bucket add git-twig https://github.com/leostera/git-twig` and
+`scoop install git-twig/git-twig`. Check `git twig --version` through the shim and
+one native `git twig new` on a Dev Drive. Afterwards remove the temporary Scoop,
+its user PATH entry and the SCOOP variable it set.
 
 ## 8. Deploy and test the production website
 

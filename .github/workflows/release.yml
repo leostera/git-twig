@@ -43,6 +43,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          ./scripts/check-windows-binary.ps1 target/${{ matrix.target }}/release/git-twig.exe
           New-Item -ItemType Directory -Path package, dist | Out-Null
           Copy-Item target/${{ matrix.target }}/release/git-twig.exe, LICENSE, README.md, CHANGELOG.md package/
           Compress-Archive -Path package/* -DestinationPath "dist/git-twig-$env:GITHUB_REF_NAME-${{ matrix.target }}.zip"
@@ -68,6 +69,7 @@ jobs:
           python3 scripts/check-release-version.py "${GITHUB_REF_NAME#v}"
           (cd dist && sha256sum *.tar.gz *.zip) > dist/SHA256SUMS
           python3 scripts/release-formula.py "${GITHUB_REF_NAME#v}" dist > dist/git-twig.rb
+          python3 scripts/release-scoop.py "${GITHUB_REF_NAME#v}" dist > "$RUNNER_TEMP/git-twig.json"
           python3 scripts/release-notes.py "${GITHUB_REF_NAME#v}" > "$RUNNER_TEMP/release-notes.md"
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
           git config user.name "github-actions[bot]"
@@ -75,8 +77,9 @@ jobs:
           git fetch origin main
           git switch -c "formula-${GITHUB_REF_NAME}" origin/main
           cp dist/git-twig.rb Formula/git-twig.rb
-          git add Formula/git-twig.rb
-          git commit -m "chore: update Homebrew formula for $GITHUB_REF_NAME"
+          mkdir -p bucket && cp "$RUNNER_TEMP/git-twig.json" bucket/git-twig.json
+          git add Formula/git-twig.rb bucket/git-twig.json
+          git commit -m "chore: update Homebrew formula and Scoop manifest for $GITHUB_REF_NAME"
           git push origin HEAD:main
         env:
           GH_TOKEN: ${{ github.token }}

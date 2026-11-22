@@ -15,7 +15,19 @@ Or install from crates.io with Rust 1.95+ and Git 2.40+:
 cargo install git-twig --locked
 ```
 
-On Windows, use `cargo install` or the `.zip` attached to each release.
+On Windows, with [Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add git-twig https://github.com/leostera/git-twig
+scoop install git-twig/git-twig
+```
+
+Or run `cargo install git-twig --locked` (needs the Visual Studio C++ build
+tools), or download the release `.zip`, check it against `SHA256SUMS` and put
+`git-twig.exe` on `PATH`. The binary needs no extra runtime. Native cloning
+needs a ReFS volume or Dev Drive; elsewhere, including NTFS, Twig uses stock
+Git. For help on Windows, use `git twig -h`: `git twig --help` asks Git for
+HTML docs it doesn't have.
 
 For local development: `cargo install --path crates/git-twig --locked`.
 

@@ -74,7 +74,7 @@ git twig --version
 - `-h` and `--version`: print usage or the installed version. Short command help
   such as `git twig new --help` also works outside a repository. Git itself turns
   top-level `git twig --help` into a manual lookup; Homebrew installs that manual,
-  while Cargo users can use `git twig -h` or `git-twig --help`.
+  while Cargo, Scoop and Windows users can use `git twig -h` or `git-twig --help`.
 
 Standard Git worktree options are passed through. Use `git worktree <command> -h`
 for the full options of a delegated command (`new` uses Git's `add` options).

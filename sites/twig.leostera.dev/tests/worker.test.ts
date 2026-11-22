@@ -47,6 +47,8 @@ test("onboarding is plain text with real install and usage instructions", async 
   expect(text).toContain(`Version ${manifest.workspace.package.version} is published`);
   expect(text).toContain("brew install leostera/git-twig/git-twig");
   expect(text).toContain("cargo install git-twig --locked");
+  expect(text).toContain("scoop bucket add git-twig https://github.com/leostera/git-twig");
+  expect(text).toContain("scoop install git-twig/git-twig");
   expect(text).not.toContain("no tagged binary release");
   expect(text).toContain("## CLI reference");
   for (const command of [
