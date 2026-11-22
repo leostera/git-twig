@@ -21,6 +21,11 @@ describe changes from this baseline after they are implemented and verified.
   their own. In-place dedupe leaves such files alone.
 - Windows CI on NTFS and a ReFS Dev Drive with native cloning required, and
   a Windows `.zip` in each release with its SHA-256.
+- npm: `npm install -g git-twig` on macOS (arm64, x64), Linux (x64, arm64,
+  glibc) and Windows (x64). One package carries every release binary; nothing
+  is downloaded at install time, and on macOS and Linux the command becomes the
+  native binary, so Node does not start for each run.
+- Linux arm64 (`aarch64-unknown-linux-gnu`) release archives.
 - Windows install with Scoop: `scoop bucket add git-twig
   https://github.com/leostera/git-twig`, then `scoop install git-twig/git-twig`.
   The release binary links the C runtime statically, so it runs without the

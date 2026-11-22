@@ -119,6 +119,53 @@ jobs:
           cargo test -p git-twig --locked
       - run: cargo build --workspace --release --locked
       - run: ./scripts/check-windows-binary.ps1 target/release/git-twig.exe
+  npm-package:
+    # Pack the npm package with this runner's binary, install it globally, and
+    # run it as `git twig`, with install scripts allowed and disabled.
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p git-twig
+      - run: |
+          set -euo pipefail
+          version=$(cargo metadata --no-deps --format-version 1 | python -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          platform=$(node -p 'process.platform + "-" + process.arch')
+          binary=target/release/git-twig; [ "$RUNNER_OS" = Windows ] && binary=target/release/git-twig.exe
+          work="$RUNNER_TEMP/npm"
+          package=$(python scripts/npm-package.py "$version" --binary "$platform=$binary" --out "$work")
+          (cd "$work" && npm pack --silent "$package")
+          git config --global user.name ci; git config --global user.email ci@example.invalid
+          for mode in scripts no-scripts; do
+            prefix="$work/prefix-$mode"; flags=(); [ $mode = no-scripts ] && flags=(--ignore-scripts)
+            npm install -g --prefix "$prefix" "${flags[@]}" "$work/git-twig-$version.tgz"
+            bin="$prefix/bin"; [ "$RUNNER_OS" = Windows ] && bin="$prefix"
+            PATH="$bin:$PATH" git twig --version | grep -Fx "git-twig $version"
+            # After its first run (or the install script) the command is the
+            # native binary on macOS and Linux, so Node never starts again.
+            if [ "$RUNNER_OS" != Windows ]; then
+              ! head -c 2 "$prefix/lib/node_modules/git-twig/bin/git-twig.js" | grep -q '#!'
+            fi
+            repo="$work/repo-$mode"
+            git init -q -b main "$repo/main"
+            git -C "$repo/main" commit -q --allow-empty -m init
+            PATH="$bin:$PATH" git -C "$repo/main" twig new -q -b x ../x HEAD
+            test "$(PATH="$bin:$PATH" git -C "$repo/main" twig list | wc -l)" -eq 2
+          done
   minimum-git:
     strategy:
       matrix:

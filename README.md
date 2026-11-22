@@ -9,6 +9,13 @@ brew tap leostera/git-twig https://github.com/leostera/git-twig
 brew install leostera/git-twig/git-twig
 ```
 
+Or with npm, on macOS, Linux or Windows (one package, no download at install
+time):
+
+```sh
+npm install -g git-twig
+```
+
 Or install from crates.io with Rust 1.95+ and Git 2.40+:
 
 ```sh
@@ -24,7 +31,8 @@ scoop install git-twig/git-twig
 
 Or run `cargo install git-twig --locked` (needs the Visual Studio C++ build
 tools), or download the release `.zip`, check it against `SHA256SUMS` and put
-`git-twig.exe` on `PATH`. The binary needs no extra runtime. Native cloning
+`git-twig.exe` on `PATH`. The binary needs no extra runtime. Prefer Scoop over
+npm on Windows: npm's launcher adds about 0.4 s to each `git twig` there. Native cloning
 needs a ReFS volume or Dev Drive; elsewhere, including NTFS, Twig uses stock
 Git. For help on Windows, use `git twig -h`: `git twig --help` asks Git for
 HTML docs it doesn't have.

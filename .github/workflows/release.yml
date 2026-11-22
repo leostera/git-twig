@@ -16,6 +16,8 @@ jobs:
           # Keep the binary's glibc baseline compatible with supported LTS hosts.
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
@@ -83,3 +85,35 @@ jobs:
           git push origin HEAD:main
         env:
           GH_TOKEN: ${{ github.token }}
+  npm:
+    # One package carrying every platform's binary, published after the GitHub
+    # release so it holds exactly the released archives' binaries.
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - run: |
+          version="${GITHUB_REF_NAME#v}"
+          package=$(python3 scripts/npm-package.py "$version" --dist dist --out "$RUNNER_TEMP/npm")
+          # A rerun after a successful publish must not fail the release.
+          if npm view "git-twig@$version" version >/dev/null 2>&1; then
+            echo "git-twig@$version is already on npm"
+          else
+            npm publish --provenance --access public "$package"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

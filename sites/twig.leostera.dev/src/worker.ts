@@ -22,6 +22,14 @@ cargo install git-twig --locked
 git twig --version
 \`\`\`
 
+Or with npm, on macOS, Linux or Windows (prebuilt binaries, nothing downloaded
+at install time):
+
+\`\`\`sh
+npm install -g git-twig
+git twig --version
+\`\`\`
+
 Or with Homebrew:
 
 \`\`\`sh
@@ -30,7 +38,7 @@ brew install leostera/git-twig/git-twig
 git twig --version
 \`\`\`
 
-On Windows, with Scoop:
+On Windows, prefer Scoop, since npm's launcher adds about 0.4 s to each git twig:
 
 \`\`\`powershell
 scoop bucket add git-twig https://github.com/leostera/git-twig
@@ -44,11 +52,11 @@ it against the release's SHA256SUMS, then put git-twig.exe on PATH. On Windows,
 use git twig -h for help; git twig --help looks for HTML docs that do not exist.
 
 Version 0.6.0 is published on crates.io and as GitHub release binaries. Use the
-published crate, Homebrew tap, Scoop bucket or release archive; do not invent a curl-to-shell installer.
+published crate, npm package, Homebrew tap, Scoop bucket or release archive; do not invent a curl-to-shell installer.
 
 For an older release, upgrade with the same manager: cargo install git-twig --locked,
 brew update followed by brew upgrade leostera/git-twig/git-twig, or scoop update
-followed by scoop update git-twig. For an existing
+followed by scoop update git-twig, or npm install -g git-twig@latest. For an existing
 Homebrew HEAD install, use brew upgrade --fetch-HEAD leostera/git-twig/git-twig.
 Do not leave multiple versions shadowing each other in PATH. Verify that
 git twig --version reports at least 0.6.0 and git twig new --help works.

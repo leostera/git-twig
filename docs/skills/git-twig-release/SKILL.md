@@ -1,7 +1,7 @@
 ---
 name: git-twig-release
 description: >-
-  Release git-twig end to end: prepare a stable version and changelog, integrate tested code, publish the immutable tag, crate, GitHub archives/checksums and Homebrew formula, deploy the website, and verify public artifacts. Use when shipping git-twig or finishing/recovering its release pipeline.
+  Release git-twig end to end: prepare a stable version and changelog, integrate tested code, publish the immutable tag, crate, GitHub archives/checksums, Homebrew formula, Scoop manifest and npm package, deploy the website, and verify public artifacts. Use when shipping git-twig or finishing/recovering its release pipeline.
 license: MIT
 ---
 
@@ -9,7 +9,8 @@ license: MIT
 
 This skill is a procedure, not permission to publish. Obtain explicit owner approval
 for main/tag pushes, crates.io publication, the GitHub release/environment gate,
-Homebrew publication, website deployment and verification uploads. Respect the
+Homebrew and Scoop publication, npm publication, website deployment and
+verification uploads. Respect the
 harness's confirmation mechanism. Never approve your own confirmation prompt.
 Credentials already being available does not authorize publication.
 
@@ -191,6 +192,12 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew fetch --formula leostera/git-twig/git-twig
 ```
 Inspect/preserve any existing tap edits before updating it. Tap/fetch changes
 package-manager metadata/cache, not the installed CLI. Do not silently upgrade it.
+
+For npm, the `npm` job waits on the release environment after the GitHub release;
+approve it only with owner approval. Then, in an isolated prefix, run
+`npm install -g --prefix <temporary> git-twig@VERSION`, check `npm view
+git-twig@VERSION dist.attestations` shows provenance, and run `git twig --version`
+from that prefix. Each binary in the package must hash equal to its archive's.
 
 On Windows, confirm bucket/git-twig.json's URL and hash match the published zip,
 then install through an isolated Scoop (`install.ps1 -ScoopDir <temporary>`),
