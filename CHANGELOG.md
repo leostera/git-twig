@@ -64,6 +64,8 @@ describe changes from this baseline after they are implemented and verified.
 
 ### Fixed
 
+- `adopt` on a layout that is already adopted says nothing moved, rather than
+  "Layout adopted".
 - macOS: files in a new worktree inherit ACL entries from the destination's
   parent, as files Git writes do. Whole-directory clones kept each donor file's
   own ACL; staging that inherited an ACL now clones file by file.

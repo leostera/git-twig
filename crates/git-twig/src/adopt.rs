@@ -709,7 +709,11 @@ mod layout {
                 .args(["config", "--local", ROOT_KEY])
                 .arg(&plan.root),
         ).context("layout was adopted, but saving the root failed; worktree files remain at the displayed destinations")?;
-        println!("Layout adopted. Saved worktrees directory: {:?}", plan.root);
+        if plan.moves.is_empty() {
+            println!("Worktrees are already in this layout; nothing moved.");
+        } else {
+            println!("Layout adopted. Saved worktrees directory: {:?}", plan.root);
+        }
         #[cfg(target_os = "macos")]
         if let Some(mut session) = compaction {
             session.relocated(&plan.repository.main, &plan.main_destination);

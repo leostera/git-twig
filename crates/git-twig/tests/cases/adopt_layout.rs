@@ -201,6 +201,12 @@ fn adopts_nested_worktrees_and_main_into_its_own_old_root_without_losing_state()
     // A completed adoption leaves nothing beside the checkouts.
     assert_eq!(twig_state(&f.root)?, Vec::<PathBuf>::new());
     assert_eq!(twig_state(&f.source)?, Vec::<PathBuf>::new());
+    assert!(stdout.contains("Layout adopted."), "{stdout}");
+    // Adopting the adopted layout again moves nothing and says so.
+    let again = checked(twig(&main, &["adopt", "--yes"])?)?;
+    let again = String::from_utf8_lossy(&again.stdout);
+    assert!(again.contains("already in this layout"), "{again}");
+    assert!(!again.contains("Layout adopted."), "{again}");
     // Git still sees the original staged/dirty distinction after its links move.
     let status = git(&target, &["status", "--porcelain"])?;
     assert!(String::from_utf8_lossy(&status.stdout).contains("MM hello.txt"));
