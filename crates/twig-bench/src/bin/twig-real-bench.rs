@@ -145,6 +145,9 @@ struct Operation {
     git_written_paths: Option<usize>,
     verified: bool,
     error: Option<String>,
+    /// Twig's stated reason for using stock Git, kept for error messages only.
+    #[serde(skip)]
+    delegation: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -778,8 +781,12 @@ fn cohort(
         ensure!(
             warmup.error.is_none()
                 && (backend != "twig" || !options.require_native || warmup.native_cow),
-            "warmup did not use expected backend: {:?}",
-            warmup.error
+            "warmup did not use expected backend: {:?}; {}",
+            warmup.error,
+            warmup
+                .delegation
+                .as_deref()
+                .unwrap_or("Twig gave no stock Git reason")
         );
         if matches!(
             filesystem,
@@ -1149,6 +1156,16 @@ fn checkout_counts(stderr: &[u8]) -> Option<CheckoutCounts> {
     })
 }
 
+/// The `git-twig: stock Git: ...` trace lines, which say why Twig delegated.
+fn delegation(stderr: &[u8]) -> Option<String> {
+    let reasons: Vec<_> = String::from_utf8_lossy(stderr)
+        .lines()
+        .filter_map(|line| line.strip_prefix("git-twig: stock Git: "))
+        .map(str::to_owned)
+        .collect();
+    (!reasons.is_empty()).then(|| reasons.join("; "))
+}
+
 fn create(
     seed: &Path,
     destination: &Path,
@@ -1188,6 +1205,7 @@ fn create(
             verified_clones: checkout_counts(&output.stderr).map(|counts| counts.verified_clones),
             git_written_paths: checkout_counts(&output.stderr)
                 .map(|counts| counts.git_written_paths),
+            delegation: delegation(&output.stderr),
             verified: false,
             error: if output.status.success() {
                 None
@@ -1207,6 +1225,7 @@ fn create(
             git_written_paths: None,
             verified: false,
             error: Some(error.to_string()),
+            delegation: None,
         },
     }
 }
@@ -1964,6 +1983,16 @@ mod tests {
         assert!(private_write_probe(&[entry(vec![]), entry(vec![0; 32])]).is_none());
     }
     #[test]
+    fn delegation_reasons_come_from_twig_trace_lines() {
+        let stderr = b"git-twig: private staging: x\ngit-twig: stock Git: donor changed\nfatal: other\ngit-twig: stock Git: retry\n";
+        assert_eq!(delegation(stderr).as_deref(), Some("donor changed; retry"));
+        assert_eq!(
+            delegation(b"git-twig: Windows block clone CoW: verified tracked files\n"),
+            None
+        );
+    }
+
+    #[test]
     fn creation_makespan_uses_cli_endpoints_not_observer_delay() {
         let operation = |end| Operation {
             worker: 0,
@@ -1977,6 +2006,7 @@ mod tests {
             git_written_paths: None,
             verified: false,
             error: None,
+            delegation: None,
         };
         let operations = [operation(7.0), operation(19.0), operation(13.0)];
         std::thread::sleep(Duration::from_millis(5)); // Simulate a delayed observer.
