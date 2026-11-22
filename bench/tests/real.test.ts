@@ -180,3 +180,23 @@ test("ReFS Dev Drives compare file-data clusters, not volume free space", () => 
   delete (raw.cohorts[3]!.before as Record<string, unknown>).fileDataBytes;
   expect(() => parseReal(raw, expected)).toThrow("file-data clusters");
 });
+test("a Dev Drive whose files are all resident has no file-data clusters", () => {
+  const { raw, expected } = fixture();
+  raw.filesystem = "windows-dev-drive";
+  expected.filesystem = "windows-dev-drive";
+  // ReFS keeps small files in its metadata, so a tiny checkout allocates none.
+  for (const cohort of raw.cohorts) {
+    for (const key of [
+      "before",
+      "afterCreate",
+      "afterStatus",
+      "afterPrivateWrites",
+    ] as const)
+      Object.assign(cohort[key]!, { fileDataBytes: 0 });
+    Object.assign(cohort, { fileDataGrowthAfterStatusBytes: 0 });
+  }
+  const rows = summarizeReal(parseReal(raw, expected));
+  expect(rows.map((r) => r.allocationMedianBytes)).toEqual([0, 0]);
+  (raw.cohorts[0]!.before as Record<string, unknown>).fileDataBytes = -4096;
+  expect(() => parseReal(raw, expected)).toThrow("file-data clusters");
+});

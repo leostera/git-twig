@@ -427,7 +427,7 @@ fn main() -> Result<()> {
         ));
     }
     if filesystem == Filesystem::WindowsDevDrive {
-        suite.notes.push("Windows images are fresh expandable VHDX files formatted as ReFS Dev Drives (format.com /DevDrv), mounted at an NTFS folder through diskpart; requires an elevated session. Allocation is total minus free bytes from GetDiskFreeSpaceExW, each sample taken after FlushFileBuffers on the volume handle (ReFS otherwise commits frees and writes up to ~40 s later), sampled until stable. ReFS counts block-cloned clusters once. Images are detached and deleted after each cohort.".into());
+        suite.notes.push("Windows images are fresh expandable VHDX files formatted as ReFS Dev Drives (format.com /DevDrv), mounted at an NTFS folder through diskpart; requires an elevated session. Volume allocation is total minus free bytes from GetDiskFreeSpaceExW, each sample taken after FlushFileBuffers on the volume handle (ReFS otherwise commits frees and writes up to ~40 s later); it keeps drifting, so comparisons use file data: the distinct clusters files reference (FSCTL_GET_RETRIEVAL_POINTERS), counting block-cloned clusters once. Small files ReFS keeps resident in its metadata have no clusters for either backend, and metadata is not counted. Images are detached and deleted after each cohort.".into());
         suite.notes.push(match env::var_os("TWIG_BENCH_GIT_CONFIG_GLOBAL") {
             Some(path) => format!("Global Git config for every command: {}", fs::read_to_string(&path).map(|text| text.replace('\n', "; ")).unwrap_or_else(|_| path.to_string_lossy().into_owned())),
             None => "No global Git config: Git for Windows' system defaults, such as core.autocrlf=true, are disabled.".into(),

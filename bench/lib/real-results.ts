@@ -234,8 +234,9 @@ export function parseReal(
       }
       if (refs)
         invariant(
+          // Zero is real: ReFS keeps small files resident in its metadata.
           Number.isSafeInteger(space.fileDataBytes) &&
-            Number(space.fileDataBytes) > 0,
+            Number(space.fileDataBytes) >= 0,
           "Missing ReFS file-data clusters",
         );
       allocationStable &&= space.stable;
