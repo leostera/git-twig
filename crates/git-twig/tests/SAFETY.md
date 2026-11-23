@@ -24,6 +24,7 @@ independent reflink probe prevents silently testing fallback instead.
 | HEAD movement invalidates installation | Move detached destination HEAD after registration; reject installation before any target files are moved |
 | Retrying cannot consume another invocation's scratch | Reject reuse of partial destination; succeed at fresh destination; compare retained staging before/after and exact registrations |
 | Windows clones never replace or follow | Block-clone a 70,001-byte file (ends inside a cluster) and an empty file; refuse an existing destination and a directory source with nothing created; private writes never reach the source |
+| Windows long paths match Git | Without `core.longpaths`, a 230-character destination path clones natively although staging is longer; 252 characters delegates with the reason; with `core.longpaths=true`, 300 characters clones natively |
 | Windows paths and volumes match Git | Canonical fixture paths have no verbatim prefix; volume identity is stable; FILETIME conversion matches Git for Windows' index |
 | Disabled symlinks keep the rest shared | `core.symlinks=false` root and nested links are Git-written plain files beside a shared file, on every platform |
 | Converted clones equal Git's checkout | autocrlf, `eol=crlf`, legacy `crlf`, `ident`, `working-tree-encoding`: bytes and status match stock Git; a stale donor and an `export-subst` path are Git-written |

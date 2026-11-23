@@ -54,6 +54,15 @@ and fixed line-ending assumptions in the repository's own checks.
   `FILE_SUPPORTS_BLOCK_REFCOUNTING` before staging anything. On NTFS the
   fallback costs one volume query, and says why: "volume does not support block
   cloning (ReFS or a Dev Drive is required)".
+- **Long paths** (amended; found by the 0.6 benchmark). Staging lives at
+  `.git\twigs\staging\stage-<id>\checkout\data`, about 45 characters deeper
+  than the worktree. Git for Windows refuses paths of MAX_PATH (260) or more
+  unless `core.longpaths` is set, so an OpenClaw file Git wrote fine at its
+  destination could not be hashed in staging, and Twig fell back to Git. Git
+  runs inside staging now get `-c core.longpaths=true`. Without
+  `core.longpaths`, Twig also keeps every final path under 248 characters (the
+  directory limit) and otherwise lets Git create the worktree, so it never
+  produces a worktree the user's Git cannot read.
 - **One volume.** Staging, destination and donor must share a volume serial
   number, the Windows counterpart of comparing device numbers. The check
   follows links, as `fs::metadata` does on Unix: a volume mounted at a folder

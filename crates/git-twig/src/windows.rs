@@ -548,6 +548,31 @@ pub fn clear_readonly(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Git for Windows refuses a path of MAX_PATH (260) characters or more unless
+/// core.longpaths is set, and a directory path from 248. Twig builds the
+/// worktree in staging under longer paths, with long paths allowed there, so
+/// without core.longpaths it must keep to paths Git could write itself: a
+/// worktree Git cannot fully read is left for Git to create (or refuse).
+pub fn ensure_paths_fit<'a>(
+    long_paths: bool,
+    destination: &Path,
+    paths: impl IntoIterator<Item = &'a Path>,
+) -> Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    const LIMIT: usize = 248;
+    if long_paths {
+        return Ok(());
+    }
+    let base = destination.as_os_str().encode_wide().count() + 1;
+    for path in paths {
+        ensure!(
+            base + path.as_os_str().encode_wide().count() < LIMIT,
+            "paths of {LIMIT} or more characters need core.longpaths=true: {path:?}"
+        );
+    }
+    Ok(())
+}
+
 /// Seconds and nanoseconds since the Unix epoch, from a Windows FILETIME.
 pub fn unix_time(filetime: u64) -> (u32, u32) {
     const UNIX_EPOCH_AS_FILETIME: u64 = 116_444_736_000_000_000;

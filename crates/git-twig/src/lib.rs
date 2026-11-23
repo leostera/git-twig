@@ -242,6 +242,12 @@ fn prepare(cwd: &Path, request: &AddRequest, staging: &mut staging::Staging) -> 
     }
     #[cfg(windows)]
     windows::ensure_block_cloning(&parent)?;
+    #[cfg(windows)]
+    windows::ensure_paths_fit(
+        config_true(&root, "core.longpaths"),
+        &destination,
+        entries.iter().map(|entry| entry.path.as_path()),
+    )?;
     let stage = staging.create(&root, &destination)?;
     let data = stage.join("data");
     fs::create_dir(&data)?;

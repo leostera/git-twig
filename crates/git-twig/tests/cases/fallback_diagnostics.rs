@@ -158,3 +158,75 @@ fn gitlinks_are_git_written_empty_directories() -> Result<()> {
     clean(&f.destination())?;
     Ok(())
 }
+
+/// Commit one file whose path in a worktree at `destination` is `length`
+/// UTF-16 units long, through directories of at most 40 characters.
+#[cfg(windows)]
+fn commit_path_of_length(f: &Fixture, destination: &Path, length: usize) -> Result<String> {
+    let base = destination.as_os_str().encode_wide().count() + 1;
+    let mut remaining = length.checked_sub(base).context("fixture root too long")?;
+    let file = "f.txt";
+    remaining = remaining
+        .checked_sub(file.len())
+        .context("fixture root too long")?;
+    let mut parts = Vec::new();
+    while remaining > 0 {
+        // Each directory is a name plus its separator.
+        let name = remaining.min(41) - 1;
+        ensure!(name > 0, "cannot reach exactly {length}");
+        parts.push("d".repeat(name));
+        remaining -= name + 1;
+    }
+    parts.push(file.into());
+    let relative = parts.join("/");
+    let path = f.source.join(&relative);
+    fs::create_dir_all(path.parent().context("file has a parent")?)?;
+    fs::write(&path, "deep\n")?;
+    git(&f.source, &["add", "."])?;
+    git(&f.source, &["commit", "-qm", "deep path"])?;
+    assert_eq!(base + relative.encode_utf16().count(), length);
+    Ok(relative)
+}
+
+#[cfg(windows)]
+use anyhow::Context;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
+
+#[test]
+#[cfg(windows)]
+fn deep_paths_git_can_write_clone_natively_without_core_longpaths() -> Result<()> {
+    let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(());
+    }
+    // Writable by Git at the destination, but past MAX_PATH inside Twig's staging.
+    let relative = commit_path_of_length(&f, &f.destination(), 230)?;
+    let output = checked(f.add()?)?;
+    native(&output);
+    assert_eq!(fs::read(f.destination().join(&relative))?, b"deep\n");
+    git(&f.destination(), &["status", "--porcelain"])?;
+    clean(&f.destination())
+}
+
+#[test]
+#[cfg(windows)]
+fn paths_near_max_path_delegate_unless_core_longpaths_is_set() -> Result<()> {
+    let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(());
+    }
+    let relative = commit_path_of_length(&f, &f.destination(), 252)?;
+    let output = checked(f.add()?)?;
+    reason(&output, "need core.longpaths=true");
+    assert_eq!(fs::read(f.destination().join(&relative))?, b"deep\n");
+    clean(&f.destination())?;
+
+    let f = Fixture::new()?;
+    git(&f.source, &["config", "core.longpaths", "true"])?;
+    let relative = commit_path_of_length(&f, &f.destination(), 300)?;
+    let output = checked(f.add()?)?;
+    native(&output);
+    assert_eq!(fs::read(f.destination().join(&relative))?, b"deep\n");
+    clean(&f.destination())
+}

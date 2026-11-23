@@ -76,6 +76,11 @@ impl<'a> Checkout<'a> {
 
     fn command(&self) -> Command {
         let mut command = git(self.data);
+        // Staging paths are longer than the worktree's. Windows Git refuses
+        // MAX_PATH or more unless told otherwise; windows::ensure_paths_fit
+        // keeps the final paths within it.
+        #[cfg(windows)]
+        command.args(["-c", "core.longpaths=true"]);
         command
             .env("GIT_DIR", &self.git_dir)
             .env("GIT_WORK_TREE", self.data)

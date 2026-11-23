@@ -141,8 +141,12 @@ fn hash_batch(root: &Path, batch: &HashBatch<'_>) -> Result<Vec<(usize, Option<S
     for file in &batch.files {
         quote_stdin_path(&native::path_bytes(&file.path), &mut input);
     }
+    let mut command = git(root);
+    // Staged paths may exceed MAX_PATH; see Checkout::command.
+    #[cfg(windows)]
+    command.args(["-c", "core.longpaths=true"]);
     let output = crate::checked_with_input(
-        git(root).args([
+        command.args([
             "--no-replace-objects",
             "hash-object",
             "--no-filters",

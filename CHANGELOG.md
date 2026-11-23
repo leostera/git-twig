@@ -15,6 +15,11 @@ describe changes from this baseline after they are implemented and verified.
 - Windows: `git twig adopt` layout moves, `--prepare` and in-place `--dedupe`
   on ReFS, holding both files locked against writers from comparison until
   sharing. Files open for writing or mapped are skipped.
+- Windows: repositories with deep paths clone natively. Twig's staging is
+  about 45 characters deeper than the worktree, so Git refused files there
+  that it writes fine at the destination, and Twig fell back to stock Git.
+  Git in staging now allows long paths. Without `core.longpaths`, a worktree
+  with paths of 248 characters or more is left to Git.
 - Windows: files smaller than one cluster are written rather than block
   cloned, because cloning cannot share a partial cluster and would move both
   the donor and the copy out of ReFS's resident storage into clusters of

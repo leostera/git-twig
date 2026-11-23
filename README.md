@@ -34,7 +34,8 @@ tools), or download the release `.zip`, check it against `SHA256SUMS` and put
 `git-twig.exe` on `PATH`. The binary needs no extra runtime. Prefer Scoop over
 npm on Windows: npm's launcher adds about 0.4 s to each `git twig` there. Native cloning
 needs a ReFS volume or Dev Drive; elsewhere, including NTFS, Twig uses stock
-Git. For help on Windows, use `git twig -h`: `git twig --help` asks Git for
+Git, as it does for paths of 248 or more characters unless `core.longpaths` is
+set. For help on Windows, use `git twig -h`: `git twig --help` asks Git for
 HTML docs it doesn't have.
 
 For local development: `cargo install --path crates/git-twig --locked`.
