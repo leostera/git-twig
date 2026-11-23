@@ -547,7 +547,11 @@ impl Image {
                 } else if filesystem == Filesystem::WindowsDevDrive {
                     "vhdx"
                 } else {
-                    "sparseimage"
+                    // A directory of 8 MiB bands. Single-file SPARSE and UDIF
+                    // images were measured at 2.5-3.9 ms per small-file write
+                    // on the shared Mac Studio, against 0.08 ms here and on the
+                    // host volume, so they bias creation time.
+                    "sparsebundle"
                 },
             ),
             mount: stem.with_extension("mount"),
@@ -570,7 +574,7 @@ impl Image {
             Command::new("hdiutil")
                 .args(["create", "-quiet", "-size"])
                 .arg(format!("{}g", self.size_gib))
-                .args(["-type", "SPARSE", "-fs"])
+                .args(["-type", "SPARSEBUNDLE", "-fs"])
                 .arg(if self.filesystem == Filesystem::CaseSensitiveImage {
                     "Case-sensitive APFS"
                 } else {
@@ -698,7 +702,7 @@ impl Image {
             self.attached = false;
         }
         if self.path.exists() {
-            fs::remove_file(&self.path)?;
+            fs::remove_dir_all(&self.path)?;
         }
         eprintln!("  disposable image detached and removed");
         Ok(())

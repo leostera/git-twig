@@ -130,7 +130,11 @@ Then change one byte in one regular file per successful worktree, measure furthe
 allocation and verify the seed file remains unchanged. This demonstrates write
 isolation and records a small-edit allocation budget without claiming every file's
 exclusive block ownership is observable. Negative deltas are retained, not clamped.
-The sparse image's host-file allocation is not the primary metric.
+The host allocation of the image is not the primary metric. macOS images are
+sparse bundles: on the shared Mac Studio, single-file sparse and read-write
+images took 2.5-3.9 ms per small-file write against 0.08 ms for a sparse bundle
+and the host volume, which inflated OpenClaw creation from 17.5 s (v0.5) to
+190-250 s with stock Git. Allocation inside the image does not depend on it.
 
 Warmup worktrees and their owned staging paths are removed before the initial
 space snapshot. After saving each cohort, detach and delete its image. On failure,
