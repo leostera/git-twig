@@ -9,6 +9,31 @@ cost in creation time and additional filesystem allocation?
 These are synthetic coverage workloads, not representative whole applications.
 They do not measure `adopt`, exclusive bytes reclaimed, or the published v0.5.0 binary.
 
+## Summary
+
+<!-- twig-preview:start -->
+
+| Workload · APFS | Stock Git | Twig v0.4 | v0.5 candidate |
+|---|---|---|---|
+| Cross-revision | 139ms / 128.09 MiB | 181ms / 128.09 MiB | 884ms / 16.08 MiB |
+| Builtin conversions | 145ms / 128.11 MiB | 372ms / 128.12 MiB | 923ms / 88.00 KiB |
+| Auto CRLF | 392ms / 128.09 MiB | 803ms / 128.09 MiB | 614ms / 88.00 KiB |
+| Submodules | 138ms / 128.09 MiB | 267ms / 128.09 MiB | 900ms / 72.00 KiB |
+| Unchanged bytes | 134ms / 128.07 MiB | 853ms / 68.00 KiB | 880ms / 68.00 KiB |
+| 4,096 small files | 1.11s / 36.41 MiB | 2.07s / 3.31 MiB | 2.08s / 3.38 MiB |
+
+Each cell is **creation time / additional disk allocation**. Medians of 3
+two-worktree batches, one create at a time, on warm-cache filesystem images.
+Synthetic workloads, not real-repository or universal speed claims. Allocation
+includes Git metadata after first status; it is not exclusive file space reclaimed.
+
+Across all levels: 992 certified creates; 2 failed points and 1 unstable observation retained.
+
+Other filesystems: [APFS (case-sensitive)](results/sha256-c4989db26497/macos-apfs-case-sensitive/2026-11-17/checkout-v05/comparison.svg) · [XFS](results/sha256-a73d956e3301/linux-xfs/2026-11-17/checkout-v05/comparison.svg) · [Btrfs](results/sha256-a73d956e3301/linux-btrfs/2026-11-17/checkout-v05/comparison.svg).
+Speed varies by workload. [Full results and limitations](#setup-and-measurements).
+
+<!-- twig-preview:end -->
+
 ## Setup and measurements
 
 The [source index](results/preview-sources.json) selects one frozen four-target
@@ -58,7 +83,7 @@ python3 bench/publish_preview.py
 python3 bench/publish_preview.py --check
 ```
 
-This derives `results/preview.json` and the marked preview table in the root README
+This derives `results/preview.json` and the marked summary table on this page
 from immutable snapshots; it does not rerun benchmarks or rewrite raw evidence.
 The website consumes that same generated JSON. See [the runner](README.md) to
 reproduce the measurements rather than only the presentation.

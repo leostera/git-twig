@@ -6,6 +6,13 @@ describe changes from this baseline after they are implemented and verified.
 
 ## Unreleased
 
+## [0.6.0] — 2026-11-23
+
+Windows support: native sharing on ReFS and Dev Drive, `adopt`, Scoop and
+npm installs. New worktrees are ready sooner, because their first `git status`
+no longer rehashes every file. `adopt` reorganizes existing worktrees into one
+layout, with offline compaction on macOS.
+
 ### Added
 
 - Windows: native copy-on-write on ReFS and Dev Drive volumes through block
@@ -73,6 +80,8 @@ describe changes from this baseline after they are implemented and verified.
   their stat data recorded, so converted checkouts skip the rehash too.
 - README benchmark times include each new worktree's first `git status`, and
   their multipliers use the same totals. Issue #8 (dsfaccini).
+- README benchmarks compare `git worktree` and Twig on Linux XFS, Btrfs and
+  Windows Dev Drive side by side, from 0.6.0 raw runs on each platform.
 - On Linux, large inventories are cloned on up to eight threads.
 - A donor with deleted tracked files, or tracked paths replaced by a symlink,
   directory or other entry, no longer disables sharing for the whole worktree.
@@ -285,6 +294,7 @@ not included.
 - JSON listing, commit/integration queues and re-sharing existing worktrees are
   not available in this release. macOS binaries are not signed or notarized.
 
+[0.6.0]: https://github.com/leostera/git-twig/releases/tag/v0.6.0
 [0.5.0]: https://github.com/leostera/git-twig/releases/tag/v0.5.0
 [0.4.0]: https://github.com/leostera/git-twig/releases/tag/v0.4.0
 [0.3.0]: https://github.com/leostera/git-twig/releases/tag/v0.3.0

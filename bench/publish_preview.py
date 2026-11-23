@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive public v0.5 preview data and README cells from frozen campaign snapshots."""
+"""Derive public v0.5 preview data and its summary table in bench/preview.md from frozen campaign snapshots."""
 import argparse
 import hashlib
 import json
@@ -154,16 +154,18 @@ def main():
     data = build()
     output = json.dumps(data, indent=2, allow_nan=False) + "\n"
     path = ROOT / "bench/results/preview.json"
-    readme = ROOT / "README.md"
+    readme = ROOT / "bench/preview.md"
     text = readme.read_text()
     start, end = "<!-- twig-preview:start -->", "<!-- twig-preview:end -->"
     require(text.count(start) == 1 and text.count(end) == 1, "missing unique preview markers")
     before, rest = text.split(start)
     _, after = rest.split(end)
-    rendered = before + start + "\n\n" + markdown(data) + "\n" + end + after
+    # Generated links are repository-relative; this page lives in bench/.
+    table = markdown(data).replace("](bench/preview.md)", "](#setup-and-measurements)").replace("](bench/", "](")
+    rendered = before + start + "\n\n" + table + "\n" + end + after
     if args.check:
         require(path.read_text() == output, "preview JSON is stale")
-        require(text == rendered, "preview README is stale")
+        require(text == rendered, "preview table in bench/preview.md is stale")
     else:
         path.write_text(output)
         readme.write_text(rendered)
