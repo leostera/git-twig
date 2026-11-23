@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "real-repository-campaign",
+  "generatedAt": "2026-11-23T01:29:57.518Z",
+  "commit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+  "dirty": false,
+  "candidate": {
+    "version": "git-twig 0.6.0",
+    "sourceCommit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+    "sha256": "7c7df4185a2b6f0f89db1a712bdd922b17f3beedff68a1130ed282935c0b8c6c"
+  },
+  "git": {
+    "version": "git version 2.53.0",
+    "sha256": "ed8b2df973b28c0fb773b9c0dc0816d3ee2b3835bb932d9153c21417bb51b362"
+  },
+  "worker": {
+    "sha256": "e118f9856e65e2b1b5d090facd5fea817a9cb3ee4ad4631d95cde2faf1f7ec8f"
+  },
+  "config": {
+    "target": "linux-xfs",
+    "filesystem": "linux-xfs-image",
+    "rounds": 3,
+    "concurrency": 1,
+    "warmup": true,
+    "budgetSeconds": 20851,
+    "pointSeconds": 7200,
+    "minimumFreeGiB": 128,
+    "maxGrowthGiB": 160,
+    "environment": "Threadripper 2990WX; Ubuntu 26.04 host, kernel 7.0.0-43-generic; disposable privileged ubuntu:26.04 container sha256:7ccc57f436392819d3868fad33503ee5f9841c71d5ba29587d00b26efa80b955; git version 2.53.0 and mkfs.xfs version 6.18.0, mkfs.btrfs, part of btrfs-progs v6.17.1 from the container; owned loopback images on ext4 /media/data-0 (NVMe /dev/nvme0n1p1, idle); inputs and checkout on the same NVMe. git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 with rustc 1.95.0 (59807616e 2026-04-14) on the host. Original v0.4 pins; serial paired three rounds with warmup; long allocation settlement. The starbase3 Windows VM (16 vCPUs, other NVMe) runs the Windows campaign at the same time; other user apps are not stopped."
+  },
+  "inputs": [
+    {
+      "label": "openclaw",
+      "revision": "410c0dda40702e25263b49b8b7d0786a5e49e366",
+      "worktrees": 1,
+      "imageGiB": 24,
+      "hostTiming": true
+    }
+  ],
+  "status": "completed",
+  "stopReason": null,
+  "resourceSamples": [
+    {
+      "freeGiB": 1283.9765090942383,
+      "growthGiB": 0.000003814697265625,
+      "elapsedMs": 0.7529299999587238
+    },
+    {
+      "freeGiB": 1264.5873908996582,
+      "growthGiB": 19.389122009277344,
+      "elapsedMs": 579627.502508
+    }
+  ],
+  "jobs": [
+    {
+      "repository": "openclaw",
+      "file": "openclaw.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 7200000,
+      "error": null,
+      "startedElapsedMs": 27.63604899996426,
+      "finishedElapsedMs": 579686.5048449999,
+      "exitCode": 0
+    }
+  ],
+  "notes": [
+    "git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 vs frozen stock Git. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.",
+    "No retries, no automatic exclusion of errors, and no website changes. Unstable allocation observations remain raw data, not comparative allocation claims.",
+    "Host timing and filesystem-image allocation are separate environments; never combine them into one cohort. Warm caches on shared hosts; background apps not stopped. No cold-cache, saturation or universal speed claim.",
+    "Full independent raw-byte/mode/symlink verification, native-clone checks, source isolation and private writes are mandatory. Verification follows creation timing. Original sources are read-only; applications and dependency scripts are never executed.",
+    "Observed nearest-rank percentiles from small finite samples are not population tail estimates. CLI creation and subsequent first-status latency are reported separately."
+  ]
+}

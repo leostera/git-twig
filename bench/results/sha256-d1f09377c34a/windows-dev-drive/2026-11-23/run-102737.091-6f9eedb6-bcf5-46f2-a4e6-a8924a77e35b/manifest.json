@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "real-repository-campaign",
+  "generatedAt": "2026-11-23T10:27:37.095Z",
+  "commit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+  "dirty": false,
+  "candidate": {
+    "version": "git-twig 0.6.0",
+    "sourceCommit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+    "sha256": "d1f09377c34a5c4ed8afbcc2b84b790ae6788e9730f58222bd47c5206568de89"
+  },
+  "git": {
+    "version": "git version 2.56.0.windows.4",
+    "sha256": "20d0dde30a65afb6e5810a883700a94dcd77fbf3b44b32868d45bf7c9b30137c"
+  },
+  "worker": {
+    "sha256": "3837c9dd880985dc77c5e6e2cb68d7aae0c50d2fed6456ead869e7a7c86d843c"
+  },
+  "config": {
+    "target": "windows-dev-drive",
+    "filesystem": "windows-dev-drive",
+    "rounds": 3,
+    "concurrency": 1,
+    "warmup": true,
+    "budgetSeconds": 21600,
+    "pointSeconds": 5400,
+    "minimumFreeGiB": 64,
+    "maxGrowthGiB": 160,
+    "environment": "starbase3: Windows 11 VM (Microsoft Windows 11 Pro 10.0.26300) under QEMU on the starbase2 Threadripper 2990WX host. Fresh ReFS Dev Drive VHDX images under an NTFS C: folder. git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 with rustc 1.95.0 (59807616e 2026-04-14). git version 2.56.0.windows.4. Original v0.4 pins without the kernel (case-colliding paths). Serial paired three rounds with warmup. The starbase2 host is otherwise idle (its Linux campaign finished); the macOS campaign runs on another machine."
+  },
+  "inputs": [
+    {
+      "label": "workers-starter",
+      "revision": "d0b1ee485dc1cf2bc0b2a3511cf8cf1057624d02",
+      "worktrees": 10,
+      "imageGiB": 16,
+      "hostTiming": false
+    },
+    {
+      "label": "twig",
+      "revision": "96c43950e4c0d8524de4ad53157c136eb222d39c",
+      "worktrees": 10,
+      "imageGiB": 16,
+      "hostTiming": false
+    },
+    {
+      "label": "axo",
+      "revision": "67af816be26633039e8507d93d577b2073d6f5fd",
+      "worktrees": 1,
+      "imageGiB": 16,
+      "hostTiming": false
+    },
+    {
+      "label": "openclaw",
+      "revision": "410c0dda40702e25263b49b8b7d0786a5e49e366",
+      "worktrees": 1,
+      "imageGiB": 24,
+      "hostTiming": false
+    },
+    {
+      "label": "pulumi",
+      "revision": "430261138aa08539cd598b9269bfe8f82fd49b78",
+      "worktrees": 1,
+      "imageGiB": 16,
+      "hostTiming": false
+    }
+  ],
+  "status": "completed",
+  "stopReason": null,
+  "resourceSamples": [
+    {
+      "freeGiB": 340.6973342895508,
+      "growthGiB": 0.000003814697265625,
+      "elapsedMs": 4.14140000000009
+    },
+    {
+      "freeGiB": 340.4747734069824,
+      "growthGiB": 0.222564697265625,
+      "elapsedMs": 431494.0727
+    },
+    {
+      "freeGiB": 340.47476959228516,
+      "growthGiB": 0.22256851196289062,
+      "elapsedMs": 431780.0455
+    },
+    {
+      "freeGiB": 340.4725341796875,
+      "growthGiB": 0.22480392456054688,
+      "elapsedMs": 879927.7183999999
+    },
+    {
+      "freeGiB": 340.47253036499023,
+      "growthGiB": 0.2248077392578125,
+      "elapsedMs": 880191.8459
+    },
+    {
+      "freeGiB": 340.25145721435547,
+      "growthGiB": 0.4458808898925781,
+      "elapsedMs": 1333474.4516
+    },
+    {
+      "freeGiB": 340.2514533996582,
+      "growthGiB": 0.44588470458984375,
+      "elapsedMs": 1333735.3562
+    },
+    {
+      "freeGiB": 340.2528305053711,
+      "growthGiB": 0.4445075988769531,
+      "elapsedMs": 5781583.078799999
+    },
+    {
+      "freeGiB": 340.25282287597656,
+      "growthGiB": 0.4445152282714844,
+      "elapsedMs": 5781874.099599999
+    },
+    {
+      "freeGiB": 340.2491035461426,
+      "growthGiB": 0.44823455810546875,
+      "elapsedMs": 7109884.401
+    }
+  ],
+  "jobs": [
+    {
+      "repository": "workers-starter",
+      "file": "workers-starter.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 5400000,
+      "error": null,
+      "startedElapsedMs": 226.58080000000007,
+      "finishedElapsedMs": 431776.1354,
+      "exitCode": 0
+    },
+    {
+      "repository": "twig",
+      "file": "twig.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 5400000,
+      "error": null,
+      "startedElapsedMs": 432032.3848,
+      "finishedElapsedMs": 880188.5665999999,
+      "exitCode": 0
+    },
+    {
+      "repository": "axo",
+      "file": "axo.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 5400000,
+      "error": null,
+      "startedElapsedMs": 880444.9741,
+      "finishedElapsedMs": 1333732.7791000002,
+      "exitCode": 0
+    },
+    {
+      "repository": "openclaw",
+      "file": "openclaw.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 5400000,
+      "error": null,
+      "startedElapsedMs": 1334006.8555,
+      "finishedElapsedMs": 5781870.890199999,
+      "exitCode": 0
+    },
+    {
+      "repository": "pulumi",
+      "file": "pulumi.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": true,
+      "timeoutMs": 5400000,
+      "error": null,
+      "startedElapsedMs": 5782107.429699999,
+      "finishedElapsedMs": 7110107.0181,
+      "exitCode": 0
+    }
+  ],
+  "notes": [
+    "git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 vs frozen stock Git. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.",
+    "No retries, no automatic exclusion of errors, and no website changes. Unstable allocation observations remain raw data, not comparative allocation claims.",
+    "Host timing and filesystem-image allocation are separate environments; never combine them into one cohort. Warm caches on shared hosts; background apps not stopped. No cold-cache, saturation or universal speed claim.",
+    "Full independent raw-byte/mode/symlink verification, native-clone checks, source isolation and private writes are mandatory. Verification follows creation timing. Original sources are read-only; applications and dependency scripts are never executed.",
+    "Observed nearest-rank percentiles from small finite samples are not population tail estimates. CLI creation and subsequent first-status latency are reported separately."
+  ]
+}

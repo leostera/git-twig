@@ -1,0 +1,30 @@
+pulumi: git, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  4.53s creates; 1 ok / 0 failed; allocation after status: 1239.91 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-git-0.img
+pulumi: twig, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  2.73s creates; 1 ok / 0 failed; allocation after status: 11.79 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-twig-0.img
+pulumi: twig, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  2.80s creates; 1 ok / 0 failed; allocation after status: 11.79 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-twig-1.img
+pulumi: git, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  4.38s creates; 1 ok / 0 failed; allocation after status: 1239.91 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-git-1.img
+pulumi: git, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  4.44s creates; 1 ok / 0 failed; allocation after status: 1239.91 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-git-2.img
+pulumi: twig, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  2.75s creates; 1 ok / 0 failed; allocation after status: 11.79 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795397977284-7169/pulumi-twig-2.img

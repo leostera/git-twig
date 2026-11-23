@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "kind": "first-stable-complete-paired-jobs",
+  "candidateSha256": "7c7df4185a2b6f0f89db1a712bdd922b17f3beedff68a1130ed282935c0b8c6c",
+  "source": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+  "budgetSeconds": 21600,
+  "maximumAttemptsPerRepository": 3,
+  "minimumFreeGiB": 128,
+  "maximumGrowthGiB": 160,
+  "status": "completed",
+  "attempts": [
+    {
+      "target": "linux-xfs",
+      "repository": "workers-starter",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-011729.287-b1c1269d-17fa-4b3e-99a4-6b1c16b88efa/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "twig",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012134.925-973f0f8a-6631-4620-8067-82b39efcc3b3/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "axo",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012541.893-1ddf7118-5f70-4ab3-8ced-f39403e2dd54/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "openclaw",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012957.517-be04f32c-a7a2-4fb4-94c0-feb06c31fcb0/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "pulumi",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-013937.247-8f0a8feb-0a55-4272-9de2-d38b8a5c79f6/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "linux",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-014551.282-478a18d6-7ee6-4e6d-bcbd-4ac90dececa0/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    }
+  ],
+  "accepted": [
+    {
+      "target": "linux-xfs",
+      "repository": "workers-starter",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-011729.287-b1c1269d-17fa-4b3e-99a4-6b1c16b88efa/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "twig",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012134.925-973f0f8a-6631-4620-8067-82b39efcc3b3/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "axo",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012541.893-1ddf7118-5f70-4ab3-8ced-f39403e2dd54/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "openclaw",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-012957.517-be04f32c-a7a2-4fb4-94c0-feb06c31fcb0/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "pulumi",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-013937.247-8f0a8feb-0a55-4272-9de2-d38b8a5c79f6/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "linux-xfs",
+      "repository": "linux",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-7c7df4185a2b/linux-xfs/2026-11-23/run-014551.282-478a18d6-7ee6-4e6d-bcbd-4ac90dececa0/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    }
+  ],
+  "error": null
+}

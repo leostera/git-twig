@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "repository": "twig",
+  "filesystem": "linux-btrfs-image",
+  "summary": [
+    {
+      "backend": "git",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 192.84500500000001,
+      "createsPerSecondMedian": 51.85511545917406,
+      "logicalBytesPerSecondMedian": 20121288.59650785,
+      "createP50Ms": 19.385563,
+      "createP95Ms": 22.241724,
+      "createP99Ms": 22.348732,
+      "createMaxMs": 22.348732,
+      "firstStatusP50Ms": 7.211482,
+      "allocationMedianBytes": 5423104,
+      "allocationMinBytes": 5423104,
+      "allocationMaxBytes": 5455872,
+      "maxHarnessCpuWallRatio": 0.0416603997599004
+    },
+    {
+      "backend": "twig",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 1168.530608,
+      "createsPerSecondMedian": 8.55775615250294,
+      "logicalBytesPerSecondMedian": 3320657.562099563,
+      "createP50Ms": 116.405859,
+      "createP95Ms": 124.85354,
+      "createP99Ms": 125.627543,
+      "createMaxMs": 125.627543,
+      "firstStatusP50Ms": 7.373996,
+      "allocationMedianBytes": 1458176,
+      "allocationMinBytes": 1458176,
+      "allocationMaxBytes": 1589248,
+      "maxHarnessCpuWallRatio": 0.00913882779525789
+    }
+  ]
+}

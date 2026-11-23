@@ -1,0 +1,30 @@
+axo: git, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  0.31s creates; 1 ok / 0 failed; allocation after status: 31.54 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-git-0.img
+axo: twig, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  0.72s creates; 1 ok / 0 failed; allocation after status: 4.02 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-twig-0.img
+axo: twig, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  0.56s creates; 1 ok / 0 failed; allocation after status: 3.96 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-twig-1.img
+axo: git, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  0.30s creates; 1 ok / 0 failed; allocation after status: 31.44 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-git-1.img
+axo: git, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  0.28s creates; 1 ok / 0 failed; allocation after status: 31.44 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-git-2.img
+axo: twig, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  0.76s creates; 1 ok / 0 failed; allocation after status: 3.99 MiB
+  Linux image retained at /media/data-0/twig-bench/lab-0.6/source/target/real-images/1795399595929-14965/axo-twig-2.img

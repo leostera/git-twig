@@ -1,0 +1,84 @@
+twig: git, repeat 1/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  2.39s creates; 10 ok / 0 failed; allocation after status: 4.62 MiB
+  disposable image detached and removed
+twig: twig, repeat 1/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  28.02s creates; 10 ok / 0 failed; allocation after status: 4.68 MiB
+  disposable image detached and removed
+twig: twig, repeat 2/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  28.26s creates; 10 ok / 0 failed; allocation after status: 5.16 MiB
+  disposable image detached and removed
+twig: git, repeat 2/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  2.43s creates; 10 ok / 0 failed; allocation after status: 6.56 MiB
+  disposable image detached and removed
+twig: git, repeat 3/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  2.51s creates; 10 ok / 0 failed; allocation after status: 6.72 MiB
+  disposable image detached and removed
+twig: twig, repeat 3/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  27.82s creates; 10 ok / 0 failed; allocation after status: 4.60 MiB
+  disposable image detached and removed

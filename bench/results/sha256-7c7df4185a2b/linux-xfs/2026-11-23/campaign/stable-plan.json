@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "first-stable-complete-paired-jobs",
+  "candidateSha256": "7c7df4185a2b6f0f89db1a712bdd922b17f3beedff68a1130ed282935c0b8c6c",
+  "source": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+  "budgetSeconds": 21600,
+  "maximumAttemptsPerRepository": 3,
+  "minimumFreeGiB": 128,
+  "maximumGrowthGiB": 160,
+  "status": "running",
+  "attempts": [],
+  "accepted": [],
+  "error": null,
+  "config": {
+    "schemaVersion": 1,
+    "lab": "/media/data-0/twig-bench/lab-0.6/campaign-xfs",
+    "inputs": "/media/data-0/twig-bench/lab-0.6/inputs.json",
+    "targets": [
+      "linux-xfs"
+    ],
+    "candidate": "/media/data-0/twig-bench/lab-0.6/bin/git-twig",
+    "binaryDir": "/media/data-0/twig-bench/lab-0.6/bin",
+    "sourceCommit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+    "releaseCommit": "77db979dae4797c0ce3fe7abeabdc968dcc8a7b3",
+    "environment": "Threadripper 2990WX; Ubuntu 26.04 host, kernel 7.0.0-43-generic; disposable privileged ubuntu:26.04 container sha256:7ccc57f436392819d3868fad33503ee5f9841c71d5ba29587d00b26efa80b955; git version 2.53.0 and mkfs.xfs version 6.18.0, mkfs.btrfs, part of btrfs-progs v6.17.1 from the container; owned loopback images on ext4 /media/data-0 (NVMe /dev/nvme0n1p1, idle); inputs and checkout on the same NVMe. git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 with rustc 1.95.0 (59807616e 2026-04-14) on the host. Original v0.4 pins; serial paired three rounds with warmup; long allocation settlement. The starbase3 Windows VM (16 vCPUs, other NVMe) runs the Windows campaign at the same time; other user apps are not stopped."
+  },
+  "driverSha256": "e3ff55d53bd204b64356f33e21593b9e135d2c72b2de76f60882c4b6d9c83c59"
+}

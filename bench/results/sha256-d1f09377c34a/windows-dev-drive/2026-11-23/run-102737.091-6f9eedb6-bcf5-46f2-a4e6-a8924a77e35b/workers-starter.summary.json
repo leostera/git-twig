@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "repository": "workers-starter",
+  "filesystem": "windows-dev-drive",
+  "summary": [
+    {
+      "backend": "git",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 2214.7102,
+      "createsPerSecondMedian": 4.5152634416909265,
+      "logicalBytesPerSecondMedian": 6416.189350642807,
+      "createP50Ms": 223.4505,
+      "createP95Ms": 234.7487,
+      "createP99Ms": 235.8234,
+      "createMaxMs": 235.8234,
+      "firstStatusP50Ms": 124.75845,
+      "allocationMedianBytes": 0,
+      "allocationMinBytes": 0,
+      "allocationMaxBytes": 0,
+      "maxHarnessCpuWallRatio": 0.05790810715353209
+    },
+    {
+      "backend": "twig",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 26836.9255,
+      "createsPerSecondMedian": 0.37262092485221526,
+      "logicalBytesPerSecondMedian": 529.4943342149979,
+      "createP50Ms": 2679.2969,
+      "createP95Ms": 2754.7315000000003,
+      "createP99Ms": 2754.8687,
+      "createMaxMs": 2754.8687,
+      "firstStatusP50Ms": 122.86885000000001,
+      "allocationMedianBytes": 0,
+      "allocationMinBytes": 0,
+      "allocationMaxBytes": 0,
+      "maxHarnessCpuWallRatio": 0.0029111009754079317
+    }
+  ]
+}
