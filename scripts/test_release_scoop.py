@@ -27,6 +27,12 @@ class ScoopManifest(unittest.TestCase):
         self.assertEqual(build["hash"], hashlib.sha256(b"zip bytes").hexdigest())
         self.assertEqual(manifest["bin"], "git-twig.exe")
 
+    def test_notes_explain_how_to_onboard_an_agent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pathlib.Path(directory, "git-twig-v1.2.3-x86_64-pc-windows-msvc.zip").write_bytes(b"zip")
+            manifest = json.loads(release_scoop.manifest("1.2.3", pathlib.Path(directory)))
+        self.assertIn("git twig skill", " ".join(manifest["notes"]))
+
     def test_refuses_prereleases_and_missing_zips(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(SystemExit):

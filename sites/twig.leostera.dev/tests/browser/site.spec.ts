@@ -45,7 +45,8 @@ test("onboards an agent and shows source-backed space savings", async ({
   expect(Math.abs(artworkCenter.y - 0.5)).toBeLessThan(0.015);
   if (test.info().project.name === "desktop") {
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    expect(height).toBeLessThanOrEqual(920);
+    // One short screen: hero, onboarding, install command and the six-row chart.
+    expect(height).toBeLessThanOrEqual(1000);
   }
   await page.screenshot({
     path: `test-results/landing-${test.info().project.name}.png`,
@@ -80,6 +81,17 @@ test("onboards an agent and shows source-backed space savings", async ({
   expect(installInstructions).toContain("brew install leostera/git-twig/git-twig");
   expect(installInstructions).toContain("cargo install git-twig --locked");
   await expect(page.getByRole("status")).toHaveText("", { timeout: 5000 });
+});
+test("copies the npm install command under the onboarding button", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read"]);
+  await page.goto("/");
+  const install = page.getByRole("button", { name: "npm i -g git-twig", exact: true });
+  await expect(install).toBeVisible();
+  const onboard = await page.getByRole("button", { name: "Onboard your agent to Twig" }).boundingBox();
+  expect((await install.boundingBox())!.y).toBeGreaterThan(onboard!.y + onboard!.height);
+  await install.click();
+  await expect(page.getByRole("status")).toHaveText("Install command copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("npm i -g git-twig");
 });
 test("switches the savings chart between Mac, Linux and Windows", async ({ page }) => {
   await page.goto("/");

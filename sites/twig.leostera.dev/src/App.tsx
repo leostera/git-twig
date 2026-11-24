@@ -4,6 +4,7 @@ import benchmarks from "virtual:twig-benchmarks";
 import { DiskChart } from "./PreviewChart";
 import { copyText } from "./clipboard";
 
+export const installCommand = "npm i -g git-twig";
 export const onboardPrompt =
   "Fetch and execute the appropriate instructions to set me up for Twig from https://twig.leostera.dev/llms.txt";
 
@@ -45,20 +46,21 @@ function AgentMarks() {
 export default function App() {
   const [platform, setPlatform] = useState<"mac" | "linux" | "windows">("mac");
   const [filesystem, setFilesystem] = useState<"btrfs" | "xfs">("btrfs");
-  const [copy, setCopy] = useState<"ready" | "copied" | "failed">("ready");
+  const [copy, setCopy] = useState<"ready" | "prompt" | "install" | "failed">("ready");
   useEffect(() => {
     if (copy === "ready") return;
     const timeout = setTimeout(() => setCopy("ready"), 3000);
     return () => clearTimeout(timeout);
   }, [copy]);
-  async function onboard() {
+  async function copyAndSay(text: string, copied: "prompt" | "install") {
     try {
-      await copyText(onboardPrompt);
-      setCopy("copied");
+      await copyText(text);
+      setCopy(copied);
     } catch {
       setCopy("failed");
     }
   }
+  const onboard = () => copyAndSay(onboardPrompt, "prompt");
   return (
     <div className="page">
       <a
@@ -89,13 +91,25 @@ export default function App() {
               <AgentMarks />
             </Button>
             <p className={copy === "ready" ? "sr-only" : "copy-toast"} role="status">
-              {copy === "copied"
+              {copy === "prompt"
                 ? "Setup prompt copied"
-                : copy === "failed"
-                  ? "Couldn’t copy. Please try again."
-                  : ""}
+                : copy === "install"
+                  ? "Install command copied"
+                  : copy === "failed"
+                    ? "Couldn’t copy. Please try again."
+                    : ""}
             </p>
           </div>
+          <p className="install">
+            or install it yourself:{" "}
+            <button
+              className="install-command"
+              title="Copy the install command"
+              onClick={() => copyAndSay(installCommand, "install")}
+            >
+              <code>{installCommand}</code>
+            </button>
+          </p>
         </section>
         <section className="benchmarks" aria-label="Disk usage comparison">
           <div className="platform-switch" role="group" aria-label="Operating system">

@@ -1,5 +1,7 @@
 import importlib.util
 import io
+import shutil
+import subprocess
 import json
 import pathlib
 import stat
@@ -53,6 +55,16 @@ class NpmPackage(unittest.TestCase):
         source = (npm_package.SOURCE / "lib" / "platform.js").read_text()
         for platform in npm_package.PLATFORMS:
             self.assertIn(f'"{platform}"', source)
+
+    @unittest.skipUnless(shutil.which("node"), "needs Node")
+    def test_install_says_how_to_onboard_an_agent_even_when_optimizing_fails(self):
+        source = pathlib.Path(__file__).parents[1] / "npm" / "git-twig"
+        with tempfile.TemporaryDirectory() as directory:
+            package = pathlib.Path(directory, "git-twig")
+            shutil.copytree(source, package)  # no binaries: optimizing fails
+            result = subprocess.run(["node", "install.js"], cwd=package, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("git twig skill", result.stdout + result.stderr)
 
     def test_a_missing_release_archive_is_an_error(self):
         with tempfile.TemporaryDirectory() as directory:

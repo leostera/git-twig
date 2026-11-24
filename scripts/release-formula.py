@@ -8,7 +8,12 @@ import sys
 version, directory = sys.argv[1], pathlib.Path(sys.argv[2])
 if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
     raise SystemExit("expected a stable semantic version")
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
 stanzas = {}
 for target in targets:
     name = f"git-twig-v{version}-{target}.tar.gz"
@@ -37,6 +42,9 @@ print(f'''class GitTwig < Formula
     on_intel do
       {stanzas["x86_64-unknown-linux-gnu"]}
     end
+    on_arm do
+      {stanzas["aarch64-unknown-linux-gnu"]}
+    end
   end
 
   def install
@@ -47,6 +55,13 @@ print(f'''class GitTwig < Formula
       bin.install "git-twig"
       man1.install "git-twig.1"
     end
+  end
+
+  def caveats
+    <<~EOS
+      To onboard your coding agent, ask it to run `git twig skill` and follow it.
+      It explains when and how to create worktrees with Twig.
+    EOS
   end
 
   test do

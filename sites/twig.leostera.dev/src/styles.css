@@ -146,6 +146,27 @@ h1 {
   min-width: 152px;
   text-align: left;
 }
+.install {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: #626c5b;
+}
+.install-command {
+  padding: 2px 8px;
+  border: 1px solid #dedfdc;
+  border-radius: 6px;
+  background: #fff;
+  color: #191b19;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  cursor: pointer;
+}
+.install-command:hover {
+  border-color: #acb59e;
+}
+.install-command code {
+  font: inherit;
+}
 .agent-marks {
   flex: none;
   width: 104px;

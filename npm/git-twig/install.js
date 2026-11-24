@@ -7,3 +7,6 @@ try {
 } catch (error) {
   console.warn(`git-twig: using the Node launcher for now (${error.message})`);
 }
+// npm hides install script output unless --foreground-scripts; the package
+// README says the same for everyone else.
+console.log("git-twig: to onboard your coding agent, ask it to run `git twig skill` and follow it.");

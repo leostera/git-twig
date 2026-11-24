@@ -37,7 +37,11 @@ layout, with offline compaction on macOS.
   glibc) and Windows (x64). One package carries every release binary; nothing
   is downloaded at install time, and on macOS and Linux the command becomes the
   native binary, so Node does not start for each run.
-- Linux arm64 (`aarch64-unknown-linux-gnu`) release archives.
+- Linux arm64 (`aarch64-unknown-linux-gnu`) release archives, also installed
+  by the Homebrew formula on ARM Linux.
+- Homebrew, Scoop and npm installs say how to onboard a coding agent: ask it to
+  run `git twig skill` and follow it. The website offers `npm i -g git-twig`
+  beside the onboarding prompt.
 - Windows install with Scoop: `scoop bucket add git-twig
   https://github.com/leostera/git-twig`, then `scoop install git-twig/git-twig`.
   The release binary links the C runtime statically, so it runs without the

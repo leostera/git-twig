@@ -18,7 +18,10 @@ def manifest(version: str, directory: pathlib.Path) -> str:
             "description": "Lightweight Git worktrees using native copy-on-write files",
             "homepage": "https://github.com/leostera/git-twig",
             "license": "MIT",
-            "notes": "Needs Git 2.40+ on PATH. Native cloning needs a ReFS volume or Dev Drive; elsewhere Twig uses stock Git.",
+            "notes": [
+                "To onboard your coding agent, ask it to run `git twig skill` and follow it.",
+                "Needs Git 2.40+ on PATH. Native cloning needs a ReFS volume or Dev Drive; elsewhere Twig uses stock Git.",
+            ],
             "architecture": {
                 "64bit": {
                     "url": f"https://github.com/leostera/git-twig/releases/download/v{version}/{name}",
