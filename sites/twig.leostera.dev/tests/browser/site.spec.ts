@@ -135,3 +135,26 @@ test("does not dump the prompt or claim success when both copy methods fail", as
   await expect(page.getByRole("status")).toHaveText("Couldn’t copy. Please try again.");
   await expect(page.getByText(setupPrompt, { exact: true })).toHaveCount(0);
 });
+
+const visitors = [
+  { os: "Windows", saving: 95, agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36" },
+  { os: "Linux", saving: 98, agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36" },
+];
+for (const visitor of visitors) {
+  test.describe(`a ${visitor.os} visitor`, () => {
+    test.use({ userAgent: visitor.agent });
+    test("sees their platform first, with its largest saving in the headline", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByRole("button", { name: visitor.os, exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(".description")).toContainText(`up to ${visitor.saving}% less space on disk`);
+    });
+  });
+}
+test("the headline follows the platform and filesystem shown", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Linux", exact: true }).click();
+  await page.getByRole("combobox", { name: "Linux filesystem" }).selectOption("xfs");
+  await expect(page.locator(".description")).toContainText("up to 99% less space on disk");
+  await page.getByRole("button", { name: "Windows", exact: true }).click();
+  await expect(page.locator(".description")).toContainText("up to 95% less space on disk");
+});

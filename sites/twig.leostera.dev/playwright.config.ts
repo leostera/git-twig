@@ -5,7 +5,13 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      use: { ...devices["Desktop Chrome"], channel: "chrome" },
+      // Playwright's Desktop Chrome reports Windows; the site opens on the visitor's OS.
+      use: {
+        ...devices["Desktop Chrome"],
+        channel: "chrome",
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36",
+      },
     },
     {
       name: "mobile",

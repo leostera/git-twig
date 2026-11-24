@@ -3,6 +3,7 @@ import { Button } from "@ui-sdk/react/button";
 import benchmarks from "virtual:twig-benchmarks";
 import { DiskChart } from "./PreviewChart";
 import { copyText } from "./clipboard";
+import { detectPlatform, largestSaving, type Platform } from "./platform";
 
 export const installCommand = "npm i -g git-twig";
 export const onboardPrompt =
@@ -44,7 +45,7 @@ function AgentMarks() {
 }
 
 export default function App() {
-  const [platform, setPlatform] = useState<"mac" | "linux" | "windows">("mac");
+  const [platform, setPlatform] = useState<Platform>(() => detectPlatform(navigator));
   const [filesystem, setFilesystem] = useState<"btrfs" | "xfs">("btrfs");
   const [copy, setCopy] = useState<"ready" | "prompt" | "install" | "failed">("ready");
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function App() {
     }
   }
   const onboard = () => copyAndSay(onboardPrompt, "prompt");
+  const shown = platform === "linux" ? benchmarks[filesystem] : benchmarks[platform];
   return (
     <div className="page">
       <a
@@ -82,7 +84,7 @@ export default function App() {
           <p className="tagline">lightweight git-worktrees for agents</p>
           <p className="description">
             With twig, your agents can create cheap lightweight worktrees and use
-            up to 99% less space on disk. Imagine all the worktrees you could now
+            up to {largestSaving(shown)}% less space on disk. Imagine all the worktrees you could now
             make!
           </p>
           <div className="onboard-action">
@@ -120,7 +122,7 @@ export default function App() {
               <option value="btrfs">Btrfs</option><option value="xfs">XFS</option>
             </select>}
           </div>
-          <DiskChart data={platform === "linux" ? benchmarks[filesystem] : benchmarks[platform]} />
+          <DiskChart data={shown} />
         </section>
       </main>
       <footer>

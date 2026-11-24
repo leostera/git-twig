@@ -6,7 +6,7 @@
     "dev": "cf dev",
     "build": "cf build",
     "typecheck": "tsc --noEmit",
-    "test": "bun test tests/benchmarks.test.ts tests/worker.test.ts",
+    "test": "bun test tests/benchmarks.test.ts tests/platform.test.ts tests/worker.test.ts",
     "test:e2e": "playwright test",
     "deploy": "cf deploy"
   },
