@@ -1,0 +1,17 @@
+{
+    "version": "0.6.0",
+    "description": "Lightweight Git worktrees using native copy-on-write files",
+    "homepage": "https://github.com/leostera/git-twig",
+    "license": "MIT",
+    "notes": [
+        "To onboard your coding agent, ask it to run `git twig skill` and follow it.",
+        "Needs Git 2.40+ on PATH. Native cloning needs a ReFS volume or Dev Drive; elsewhere Twig uses stock Git."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/leostera/git-twig/releases/download/v0.6.0/git-twig-v0.6.0-x86_64-pc-windows-msvc.zip",
+            "hash": "e5521cc6d9dd01f3b3d8a324d029ac25e510edd49c9fba80736f58976bc6284c"
+        }
+    },
+    "bin": "git-twig.exe"
+}
