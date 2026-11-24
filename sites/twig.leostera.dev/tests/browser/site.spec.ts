@@ -17,7 +17,7 @@ test("onboards an agent and shows source-backed space savings", async ({
   expect(githubBounds!.x).toBeGreaterThan(page.viewportSize()!.width - 80);
   await expect(page.getByText("lightweight git-worktrees for agents", { exact: true })).toBeVisible();
   await expect(page.locator(".description")).toHaveText(
-    "With twig, your agents can create cheap lightweight worktrees and use up to 97% less space on disk. Imagine all the worktrees you could now make!",
+    "With twig, your agents can create cheap lightweight worktrees and use up to 99% less space on disk. Imagine all the worktrees you could now make!",
   );
   await page.evaluate(() => document.fonts.ready);
   const bottomPadding = await page.locator("footer").evaluate(
@@ -80,6 +80,21 @@ test("onboards an agent and shows source-backed space savings", async ({
   expect(installInstructions).toContain("brew install leostera/git-twig/git-twig");
   expect(installInstructions).toContain("cargo install git-twig --locked");
   await expect(page.getByRole("status")).toHaveText("", { timeout: 5000 });
+});
+test("switches the savings chart between Mac, Linux and Windows", async ({ page }) => {
+  await page.goto("/");
+  const windows = page.getByRole("button", { name: "Windows", exact: true });
+  await windows.click();
+  await expect(windows).toHaveAttribute("aria-pressed", "true");
+  // ReFS keeps Workers starter's small files resident, and the kernel has case-colliding paths.
+  await expect(page.locator(".repo-group")).toHaveCount(4);
+  await expect(page.getByRole("heading", { name: "Pulumi docs", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Linux kernel", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Linux filesystem" })).toHaveCount(0);
+  await page.screenshot({ path: `test-results/windows-${test.info().project.name}.png`, fullPage: true });
+  await page.getByRole("button", { name: "Linux", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Linux filesystem" })).toBeVisible();
+  await expect(page.locator(".repo-group")).toHaveCount(6);
 });
 test("copies the real prompt even when the async Clipboard API is denied", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read"]);

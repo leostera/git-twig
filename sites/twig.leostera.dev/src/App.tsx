@@ -43,7 +43,7 @@ function AgentMarks() {
 }
 
 export default function App() {
-  const [platform, setPlatform] = useState<"mac" | "linux">("mac");
+  const [platform, setPlatform] = useState<"mac" | "linux" | "windows">("mac");
   const [filesystem, setFilesystem] = useState<"btrfs" | "xfs">("btrfs");
   const [copy, setCopy] = useState<"ready" | "copied" | "failed">("ready");
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function App() {
           <p className="tagline">lightweight git-worktrees for agents</p>
           <p className="description">
             With twig, your agents can create cheap lightweight worktrees and use
-            up to 97% less space on disk. Imagine all the worktrees you could now
+            up to 99% less space on disk. Imagine all the worktrees you could now
             make!
           </p>
           <div className="onboard-action">
@@ -101,11 +101,12 @@ export default function App() {
           <div className="platform-switch" role="group" aria-label="Operating system">
             <button aria-label="Mac" title="Mac" aria-pressed={platform === "mac"} onClick={() => setPlatform("mac")}><img src="/apple.svg" width="20" height="20" alt="" /></button>
             <button aria-label="Linux" title="Linux" aria-pressed={platform === "linux"} onClick={() => setPlatform("linux")}><img src="/linux.svg" width="20" height="20" alt="" /></button>
+            <button aria-label="Windows" title="Windows Dev Drive" aria-pressed={platform === "windows"} onClick={() => setPlatform("windows")}><img src="/windows.svg" width="20" height="20" alt="" /></button>
             {platform === "linux" && <select aria-label="Linux filesystem" value={filesystem} onChange={e => setFilesystem(e.target.value === "xfs" ? "xfs" : "btrfs")}>
               <option value="btrfs">Btrfs</option><option value="xfs">XFS</option>
             </select>}
           </div>
-          <DiskChart data={platform === "mac" ? benchmarks.mac : benchmarks[filesystem]} />
+          <DiskChart data={platform === "linux" ? benchmarks[filesystem] : benchmarks[platform]} />
         </section>
       </main>
       <footer>
