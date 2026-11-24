@@ -1,0 +1,23 @@
+attempt macos-apfs-case-sensitive pulumi 1
+results: /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-152755.571-807007e4-e9a0-46a0-a554-58d092c56592
+START macos-apfs-case-sensitive pulumi
+completed macos-apfs-case-sensitive pulumi
+completed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-152755.571-807007e4-e9a0-46a0-a554-58d092c56592/manifest.json
+attempt macos-apfs-case-sensitive linux 1
+results: /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-153756.621-c5841d74-641a-45bd-ba63-b2db55166810
+START macos-apfs-case-sensitive linux
+failed macos-apfs-case-sensitive linux
+failed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-153756.621-c5841d74-641a-45bd-ba63-b2db55166810/manifest.json
+failed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/campaign-apfs-3/stable-state.json
+19 | }
+20 | export function invariant(
+21 |   condition: unknown,
+22 |   message: string,
+23 | ): asserts condition {
+24 |   if (!condition) throw new Error(message);
+                                 ^
+error: Non-allocation failure is terminal; do not retry correctness errors or interruptions
+      at invariant (/Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/lib/results.ts:24:29)
+      at stableCampaign (/Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/real-stable.ts:182:13)
+
+Bun v1.4.4 (macOS arm64)

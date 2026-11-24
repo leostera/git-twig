@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "real-repository-campaign",
+  "generatedAt": "2026-11-23T14:07:38.573Z",
+  "commit": "60129e4f5406b3fc7222d1317d33fee168b06113",
+  "dirty": false,
+  "candidate": {
+    "version": "git-twig 0.6.0",
+    "sourceCommit": "60129e4f5406b3fc7222d1317d33fee168b06113",
+    "sha256": "9c1f87ef2e77af6389e10011d595ea5e5af1391d10371d40a53e030a6e102bf5"
+  },
+  "git": {
+    "version": "git version 2.56.1",
+    "sha256": "b5eaefb829ec3b61176f83ed7fddc333a9d92e762ec4e558f55baadc4314297d"
+  },
+  "worker": {
+    "sha256": "c58ba0b11f97028944e32e5faa7ddbf45809ebae593148b3060d92d85ba1b93b"
+  },
+  "config": {
+    "target": "macos-host",
+    "filesystem": "host",
+    "rounds": 3,
+    "concurrency": 1,
+    "warmup": true,
+    "budgetSeconds": 7200,
+    "pointSeconds": 1800,
+    "minimumFreeGiB": 128,
+    "maxGrowthGiB": 160,
+    "environment": "Shared Apple M1 Ultra Mac Studio (20 cores, 128 GB), internal APFS storage, freshly rebooted. git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 with rustc 1.100.0 (0ef1bc386 2026-11-09) (Homebrew) (byte-identical at 60129e4f5406b3fc7222d1317d33fee168b06113, the harness commit). Stock Git 2.56.1 (Homebrew). Original v0.4 pins; warm caches. Interactive apps running (Chrome, Axo, uTorrent Web, Cinex); no other benchmarks, builds or tests on this disk. Before the reboot, after 46 days of uptime, single-file disk images wrote small files 40x slower than the host; those results were set aside."
+  },
+  "inputs": [
+    {
+      "label": "workers-starter",
+      "revision": "d0b1ee485dc1cf2bc0b2a3511cf8cf1057624d02",
+      "worktrees": 10,
+      "imageGiB": 16,
+      "hostTiming": true
+    },
+    {
+      "label": "twig",
+      "revision": "96c43950e4c0d8524de4ad53157c136eb222d39c",
+      "worktrees": 10,
+      "imageGiB": 16,
+      "hostTiming": true
+    },
+    {
+      "label": "axo",
+      "revision": "67af816be26633039e8507d93d577b2073d6f5fd",
+      "worktrees": 1,
+      "imageGiB": 16,
+      "hostTiming": true
+    },
+    {
+      "label": "openclaw",
+      "revision": "410c0dda40702e25263b49b8b7d0786a5e49e366",
+      "worktrees": 1,
+      "imageGiB": 24,
+      "hostTiming": true
+    },
+    {
+      "label": "pulumi",
+      "revision": "430261138aa08539cd598b9269bfe8f82fd49b78",
+      "worktrees": 1,
+      "imageGiB": 16,
+      "hostTiming": true
+    }
+  ],
+  "status": "completed",
+  "stopReason": null,
+  "resourceSamples": [
+    {
+      "freeGiB": 1092.0245933532715,
+      "growthGiB": 0.0000152587890625,
+      "elapsedMs": 3.226541999999995
+    },
+    {
+      "freeGiB": 1092.0185813903809,
+      "growthGiB": 0.0060272216796875,
+      "elapsedMs": 11670.698124999999
+    },
+    {
+      "freeGiB": 1092.0185737609863,
+      "growthGiB": 0.00603485107421875,
+      "elapsedMs": 11715.329667
+    },
+    {
+      "freeGiB": 1091.991600036621,
+      "growthGiB": 0.033008575439453125,
+      "elapsedMs": 24182.778375
+    },
+    {
+      "freeGiB": 1091.991569519043,
+      "growthGiB": 0.033039093017578125,
+      "elapsedMs": 24222.989583000002
+    },
+    {
+      "freeGiB": 1090.5551795959473,
+      "growthGiB": 1.4694290161132812,
+      "elapsedMs": 37603.835999999996
+    },
+    {
+      "freeGiB": 1090.5551643371582,
+      "growthGiB": 1.4694442749023438,
+      "elapsedMs": 37642.885875
+    },
+    {
+      "freeGiB": 1071.5106735229492,
+      "growthGiB": 20.513935089111328,
+      "elapsedMs": 401072.506292
+    },
+    {
+      "freeGiB": 1071.5106163024902,
+      "growthGiB": 20.513992309570312,
+      "elapsedMs": 401126.372125
+    },
+    {
+      "freeGiB": 1039.9295921325684,
+      "growthGiB": 52.09501647949219,
+      "elapsedMs": 610720.058333
+    }
+  ],
+  "jobs": [
+    {
+      "repository": "workers-starter",
+      "file": "workers-starter.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": false,
+      "timeoutMs": 1800000,
+      "error": null,
+      "startedElapsedMs": 34.23566699999998,
+      "finishedElapsedMs": 11714.789208,
+      "exitCode": 0
+    },
+    {
+      "repository": "twig",
+      "file": "twig.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": false,
+      "timeoutMs": 1800000,
+      "error": null,
+      "startedElapsedMs": 11745.990582999999,
+      "finishedElapsedMs": 24222.56375,
+      "exitCode": 0
+    },
+    {
+      "repository": "axo",
+      "file": "axo.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": false,
+      "timeoutMs": 1800000,
+      "error": null,
+      "startedElapsedMs": 24250.157917,
+      "finishedElapsedMs": 37642.501583,
+      "exitCode": 0
+    },
+    {
+      "repository": "openclaw",
+      "file": "openclaw.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": false,
+      "timeoutMs": 1800000,
+      "error": null,
+      "startedElapsedMs": 37673.934792,
+      "finishedElapsedMs": 401125.563792,
+      "exitCode": 0
+    },
+    {
+      "repository": "pulumi",
+      "file": "pulumi.json",
+      "status": "completed",
+      "verified": true,
+      "allocationComparable": false,
+      "timeoutMs": 1800000,
+      "error": null,
+      "startedElapsedMs": 401156.353042,
+      "finishedElapsedMs": 610766.988167,
+      "exitCode": 0
+    }
+  ],
+  "notes": [
+    "git-twig 0.6.0 built from 60129e4f5406b3fc7222d1317d33fee168b06113 vs frozen stock Git. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.",
+    "No retries, no automatic exclusion of errors, and no website changes. Unstable allocation observations remain raw data, not comparative allocation claims.",
+    "Host timing and filesystem-image allocation are separate environments; never combine them into one cohort. Warm caches on shared hosts; background apps not stopped. No cold-cache, saturation or universal speed claim.",
+    "Full independent raw-byte/mode/symlink verification, native-clone checks, source isolation and private writes are mandatory. Verification follows creation timing. Original sources are read-only; applications and dependency scripts are never executed.",
+    "Observed nearest-rank percentiles from small finite samples are not population tail estimates. CLI creation and subsequent first-status latency are reported separately."
+  ]
+}

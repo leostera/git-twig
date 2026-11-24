@@ -1,0 +1,30 @@
+openclaw: git, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  8.43s creates; 1 ok / 0 failed; allocation after status: 919.57 MiB
+  disposable image detached and removed
+openclaw: twig, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  29.50s creates; 1 ok / 0 failed; allocation after status: 29.89 MiB
+  disposable image detached and removed
+openclaw: twig, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  31.37s creates; 1 ok / 0 failed; allocation after status: 29.92 MiB
+  disposable image detached and removed
+openclaw: git, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  8.66s creates; 1 ok / 0 failed; allocation after status: 919.01 MiB
+  disposable image detached and removed
+openclaw: git, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  8.67s creates; 1 ok / 0 failed; allocation after status: 919.84 MiB
+  disposable image detached and removed
+openclaw: twig, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  27.70s creates; 1 ok / 0 failed; allocation after status: 29.89 MiB
+  disposable image detached and removed

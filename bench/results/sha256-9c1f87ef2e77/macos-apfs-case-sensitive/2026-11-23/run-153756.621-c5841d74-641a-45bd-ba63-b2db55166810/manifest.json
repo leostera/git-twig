@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "kind": "real-repository-campaign",
+  "generatedAt": "2026-11-23T15:37:56.622Z",
+  "commit": "60129e4f5406b3fc7222d1317d33fee168b06113",
+  "dirty": false,
+  "candidate": {
+    "version": "git-twig 0.6.0",
+    "sourceCommit": "60129e4f5406b3fc7222d1317d33fee168b06113",
+    "sha256": "9c1f87ef2e77af6389e10011d595ea5e5af1391d10371d40a53e030a6e102bf5"
+  },
+  "git": {
+    "version": "git version 2.56.1",
+    "sha256": "b5eaefb829ec3b61176f83ed7fddc333a9d92e762ec4e558f55baadc4314297d"
+  },
+  "worker": {
+    "sha256": "c58ba0b11f97028944e32e5faa7ddbf45809ebae593148b3060d92d85ba1b93b"
+  },
+  "config": {
+    "target": "macos-apfs-case-sensitive",
+    "filesystem": "case-sensitive-image",
+    "rounds": 3,
+    "concurrency": 1,
+    "warmup": true,
+    "budgetSeconds": 20998,
+    "pointSeconds": 7200,
+    "minimumFreeGiB": 128,
+    "maxGrowthGiB": 160,
+    "environment": "Shared Apple M1 Ultra Mac Studio (20 cores, 128 GB), internal APFS storage, freshly rebooted. git-twig 0.6.0 built from 77db979dae4797c0ce3fe7abeabdc968dcc8a7b3 with rustc 1.100.0 (0ef1bc386 2026-11-09) (Homebrew) (byte-identical at 60129e4f5406b3fc7222d1317d33fee168b06113, the harness commit). Stock Git 2.56.1 (Homebrew). Original v0.4 pins; warm caches. Interactive apps running (Chrome, Axo, uTorrent Web, Cinex); no other benchmarks, builds or tests on this disk. Before the reboot, after 46 days of uptime, single-file disk images wrote small files 40x slower than the host; those results were set aside. Second campaign for OpenClaw, Pulumi and the kernel: the first stopped at an OpenClaw Twig warmup failure (Git hash-object: read error while indexing, errno 999) that five repeats did not reproduce. Third campaign for Pulumi and the kernel: the second stopped at the same error in a Pulumi Twig warmup."
+  },
+  "inputs": [
+    {
+      "label": "linux",
+      "revision": "23c62304dde29abe92013d85910d03a77dada35d",
+      "worktrees": 1,
+      "imageGiB": 32,
+      "hostTiming": false
+    }
+  ],
+  "status": "failed",
+  "stopReason": "Error: Worker exited; exit 1; no retry",
+  "resourceSamples": [
+    {
+      "freeGiB": 1039.1363105773926,
+      "growthGiB": 0,
+      "elapsedMs": 0.5368749999906868
+    }
+  ],
+  "jobs": [
+    {
+      "repository": "linux",
+      "file": "linux.json",
+      "status": "failed",
+      "verified": false,
+      "allocationComparable": false,
+      "timeoutMs": 7200000,
+      "error": "Error: Worker exited; exit 1; no retry",
+      "startedElapsedMs": 27.24908300000243,
+      "finishedElapsedMs": 1242494.647,
+      "exitCode": 1
+    }
+  ],
+  "notes": [
+    "git-twig 0.6.0 built from 60129e4f5406b3fc7222d1317d33fee168b06113 vs frozen stock Git. Three paired rounds, concurrency one, warmup enabled. Original v0.4 input pins and counts.",
+    "No retries, no automatic exclusion of errors, and no website changes. Unstable allocation observations remain raw data, not comparative allocation claims.",
+    "Host timing and filesystem-image allocation are separate environments; never combine them into one cohort. Warm caches on shared hosts; background apps not stopped. No cold-cache, saturation or universal speed claim.",
+    "Full independent raw-byte/mode/symlink verification, native-clone checks, source isolation and private writes are mandatory. Verification follows creation timing. Original sources are read-only; applications and dependency scripts are never executed.",
+    "Observed nearest-rank percentiles from small finite samples are not population tail estimates. CLI creation and subsequent first-status latency are reported separately."
+  ]
+}

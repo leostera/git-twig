@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "repository": "pulumi",
+  "filesystem": "host",
+  "summary": [
+    {
+      "backend": "git",
+      "rounds": 3,
+      "operations": 3,
+      "allocationComparable": false,
+      "batchCreateMedianMs": 5457.713124999999,
+      "createsPerSecondMedian": 0.18322692620455389,
+      "logicalBytesPerSecondMedian": 230043296.385242,
+      "createP50Ms": 5457.640916,
+      "createP95Ms": 5579.320708,
+      "createP99Ms": 5579.320708,
+      "createMaxMs": 5579.320708,
+      "firstStatusP50Ms": 573.171083,
+      "allocationMedianBytes": null,
+      "allocationMinBytes": null,
+      "allocationMaxBytes": null,
+      "maxHarnessCpuWallRatio": 0.0004659460733381192
+    },
+    {
+      "backend": "twig",
+      "rounds": 3,
+      "operations": 3,
+      "allocationComparable": false,
+      "batchCreateMedianMs": 3656.4773339999997,
+      "createsPerSecondMedian": 0.2734872689354404,
+      "logicalBytesPerSecondMedian": 343366087.99008626,
+      "createP50Ms": 3656.4048749999997,
+      "createP95Ms": 3674.867167,
+      "createP99Ms": 3674.867167,
+      "createMaxMs": 3674.867167,
+      "firstStatusP50Ms": 50.69325,
+      "allocationMedianBytes": null,
+      "allocationMinBytes": null,
+      "allocationMaxBytes": null,
+      "maxHarnessCpuWallRatio": 0.00036239139814757794
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "kind": "first-stable-complete-paired-jobs",
+  "candidateSha256": "9c1f87ef2e77af6389e10011d595ea5e5af1391d10371d40a53e030a6e102bf5",
+  "source": "60129e4f5406b3fc7222d1317d33fee168b06113",
+  "budgetSeconds": 21600,
+  "maximumAttemptsPerRepository": 3,
+  "minimumFreeGiB": 128,
+  "maximumGrowthGiB": 160,
+  "status": "failed",
+  "attempts": [
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "workers-starter",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-141749.421-ae9ac924-3dbb-4363-8c01-fcad0520a456/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "twig",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142240.664-50ef66a3-d9c9-466b-bc6d-6775c95cd95f/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "axo",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142805.702-64116ef1-067f-433a-b3d2-f5c1abc55206/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "openclaw",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-143325.703-b9151f55-6d6c-4333-bd14-50f7efa114c0/manifest.json",
+      "accepted": false,
+      "stopReason": "Error: Worker exited; exit 1; no retry"
+    }
+  ],
+  "accepted": [
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "workers-starter",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-141749.421-ae9ac924-3dbb-4363-8c01-fcad0520a456/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "twig",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142240.664-50ef66a3-d9c9-466b-bc6d-6775c95cd95f/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "axo",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142805.702-64116ef1-067f-433a-b3d2-f5c1abc55206/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    }
+  ],
+  "error": "Error: Non-allocation failure is terminal; do not retry correctness errors or interruptions"
+}

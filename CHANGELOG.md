@@ -80,8 +80,8 @@ layout, with offline compaction on macOS.
   their stat data recorded, so converted checkouts skip the rehash too.
 - README benchmark times include each new worktree's first `git status`, and
   their multipliers use the same totals. Issue #8 (dsfaccini).
-- README benchmarks compare `git worktree` and Twig on Linux XFS, Btrfs and
-  Windows Dev Drive side by side, from 0.6.0 raw runs on each platform.
+- README benchmarks compare `git worktree` and Twig on macOS APFS, Linux XFS,
+  Btrfs and Windows Dev Drive side by side, from 0.6.0 raw runs on each platform.
 - On Linux, large inventories are cloned on up to eight threads.
 - A donor with deleted tracked files, or tracked paths replaced by a symlink,
   directory or other entry, no longer disables sharing for the whole worktree.

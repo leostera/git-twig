@@ -1,6 +1,47 @@
 {
   "platforms": [
     {
+      "name": "macOS \u00b7 APFS",
+      "entries": [
+        {
+          "name": "Workers starter (10 in a row)",
+          "repository": "workers-starter",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-host/2026-11-23/run-140738.571-243f20c3-d5d6-40e4-a817-35e68b41b241/workers-starter.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-141749.421-ae9ac924-3dbb-4363-8c01-fcad0520a456/workers-starter.json"
+        },
+        {
+          "name": "git-twig (10 in a row)",
+          "repository": "twig",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-host/2026-11-23/run-140738.571-243f20c3-d5d6-40e4-a817-35e68b41b241/twig.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142240.664-50ef66a3-d9c9-466b-bc6d-6775c95cd95f/twig.json"
+        },
+        {
+          "name": "Axo",
+          "repository": "axo",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-host/2026-11-23/run-140738.571-243f20c3-d5d6-40e4-a817-35e68b41b241/axo.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-142805.702-64116ef1-067f-433a-b3d2-f5c1abc55206/axo.json"
+        },
+        {
+          "name": "OpenClaw",
+          "repository": "openclaw",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-host/2026-11-23/run-140738.571-243f20c3-d5d6-40e4-a817-35e68b41b241/openclaw.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-145124.951-60161bd9-6d1d-46ca-9b24-8fca7c152490/openclaw.json"
+        },
+        {
+          "name": "Pulumi docs",
+          "repository": "pulumi",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-host/2026-11-23/run-140738.571-243f20c3-d5d6-40e4-a817-35e68b41b241/pulumi.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-152755.571-807007e4-e9a0-46a0-a554-58d092c56592/pulumi.json"
+        },
+        {
+          "name": "Linux kernel",
+          "repository": "linux",
+          "timing": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d/linux.json",
+          "allocation": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d/linux.json"
+        }
+      ]
+    },
+    {
       "name": "Linux \u00b7 XFS",
       "entries": [
         {
@@ -119,8 +160,9 @@
     }
   ],
   "notes": [
-    "git-twig 0.6.0, built from 77db979 on each platform: Linux candidate SHA-256 7c7df4185a2b\u2026, Windows d1f09377c34a\u2026. Raw runs record the full hashes, Git binaries, input trees and harness commits.",
+    "git-twig 0.6.0, built from 77db979 on each platform: macOS candidate SHA-256 9c1f87ef2e77\u2026, Linux 7c7df4185a2b\u2026, Windows d1f09377c34a\u2026. Raw runs record the full hashes, Git binaries, input trees and harness commits.",
     "Original v0.4 input pins. Each workload/backend gets a fresh filesystem image, a seed checkout and a warmup; three paired rounds, one create at a time. Every measured create is verified independently: raw bytes, executable modes, symlink targets, native Twig cloning and an unchanged source after private writes. No failed create is retried silently.",
+    "macOS: shared Apple M1 Ultra Mac Studio (20 cores, 128 GB), freshly rebooted, Homebrew Git 2.56; interactive apps running. Time comes from the internal APFS disk (the kernel's from its image runs); space from fresh case-sensitive APFS sparse bundles. Before the reboot, single-file disk images wrote small files 40\u00d7 slower than the host disk; those runs are set aside. Three Twig warmups on sparse bundles (OpenClaw, Pulumi, kernel) failed with Git's \"read error while indexing\" (errno 999) while verifying clones, nothing registered; each repository was rerun as a whole and the failed runs are kept. 105 creates outside the harness did not reproduce it, and it never occurred on the host disk, Linux or Windows.",
     "Linux: Threadripper 2990WX, Ubuntu 26.04 host kernel 7.0.0-43, Git 2.53.0 in a disposable ubuntu:26.04 container; XFS (reflink=1) and Btrfs loopback images on NVMe. Allocation is the filesystem's used space after the first status, including metadata, logs and shared extents counted once.",
     "Windows: Windows 11 Pro 10.0.26300 VM (16 vCPUs) on the same host, Git for Windows 2.56.0; fresh ReFS Dev Drive VHDX images. ReFS keeps committing volume changes for tens of seconds, so space is the file data clusters files reference, block-cloned clusters counted once. Files ReFS keeps resident in its metadata (Workers starter's are all small) have no clusters for either backend. The Linux kernel is not measured on Windows: it has paths that differ only in case.",
     "Time is creation plus each new worktree's first `git status`. 0.6 writes a verified index during creation, so its first status no longer rehashes every file: on macOS, OpenClaw takes longer to create than with 0.5 but is ready sooner.",

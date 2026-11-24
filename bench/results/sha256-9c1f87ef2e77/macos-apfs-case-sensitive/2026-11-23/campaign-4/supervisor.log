@@ -1,0 +1,11 @@
+attempt macos-apfs-case-sensitive linux 1
+results: /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-161240.658-647ed65c-0097-4053-86bc-d3070f12e324
+START macos-apfs-case-sensitive linux
+failed macos-apfs-case-sensitive linux
+failed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-161240.658-647ed65c-0097-4053-86bc-d3070f12e324/manifest.json
+attempt macos-apfs-case-sensitive linux 2
+results: /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d
+START macos-apfs-case-sensitive linux
+completed macos-apfs-case-sensitive linux
+completed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d/manifest.json
+completed /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/campaign-apfs-4/stable-state.json

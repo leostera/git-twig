@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "repository": "twig",
+  "filesystem": "case-sensitive-image",
+  "summary": [
+    {
+      "backend": "git",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 311.85595900000004,
+      "createsPerSecondMedian": 32.06608599709329,
+      "logicalBytesPerSecondMedian": 12442571.283366112,
+      "createP50Ms": 29.468459,
+      "createP95Ms": 45.302334,
+      "createP99Ms": 46.893542000000004,
+      "createMaxMs": 46.893542000000004,
+      "firstStatusP50Ms": 10.742771000000001,
+      "allocationMedianBytes": 5730304,
+      "allocationMinBytes": 5722112,
+      "allocationMaxBytes": 5734400,
+      "maxHarnessCpuWallRatio": 0.03432331863285553
+    },
+    {
+      "backend": "twig",
+      "rounds": 3,
+      "operations": 30,
+      "allocationComparable": true,
+      "batchCreateMedianMs": 2506.306208,
+      "createsPerSecondMedian": 3.9899354548460666,
+      "logicalBytesPerSecondMedian": 1548210.6646084643,
+      "createP50Ms": 251.226542,
+      "createP95Ms": 269.90391600000004,
+      "createP99Ms": 281.408,
+      "createMaxMs": 281.408,
+      "firstStatusP50Ms": 9.007562499999999,
+      "allocationMedianBytes": 663552,
+      "allocationMinBytes": 524288,
+      "allocationMaxBytes": 663552,
+      "maxHarnessCpuWallRatio": 0.004402095787331666
+    }
+  ]
+}

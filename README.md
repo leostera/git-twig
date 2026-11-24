@@ -2,7 +2,7 @@
 
 Make as many Git worktrees as you like: `git twig new` creates an ordinary
 linked worktree that shares unchanged files with one you already have, so a
-new checkout of Pulumi's docs adds 12 MiB instead of 1.2 GiB. Every shared byte
+new checkout of Pulumi's docs adds 7.6 MiB instead of 1.2 GiB on macOS. Every shared byte
 is verified against the commit first, and edits stay private to the worktree
 that makes them.
 
@@ -67,36 +67,36 @@ with Twig, and to ask before cleaning up.
 
 **Additional disk space**
 
-| Repo | Linux · XFS | Linux · Btrfs | Windows · Dev Drive |
-|---|---|---|---|
-| Workers starter (10 in a row) | 584 KiB → 304 KiB, **1.9× less** | 256 KiB → 224 KiB, **1.1× less** | 0 KiB → 0 KiB, same disk usage |
-| git-twig (10 in a row) | 5.4 MiB → 680 KiB, **8.1× less** | 5.2 MiB → 1.4 MiB, **3.7× less** | 4.0 MiB → 1.1 MiB, **3.5× less** |
-| Axo | 31.2 MiB → 1.8 MiB, **17.8× less** | 31.4 MiB → 4.0 MiB, **7.9× less** | 27.3 MiB → 6.0 MiB, **4.6× less** |
-| OpenClaw | 925 MiB → 46.2 MiB, **20.0× less** | 953 MiB → 112 MiB, **8.5× less** | 820 MiB → 197 MiB, **4.2× less** |
-| Pulumi docs | 1.2 GiB → 11.8 MiB, **105.2× less** | 1.2 GiB → 23.1 MiB, **54.3× less** | 1.2 GiB → 50.9 MiB, **24.0× less** |
-| Linux kernel | 1.8 GiB → 70.6 MiB, **26.8× less** | 1.8 GiB → 171 MiB, **11.1× less** | not measured |
+| Repo | macOS · APFS | Linux · XFS | Linux · Btrfs | Windows · Dev Drive |
+|---|---|---|---|---|
+| Workers starter (10 in a row) | 668 KiB → 384 KiB, **1.7× less** | 584 KiB → 304 KiB, **1.9× less** | 256 KiB → 224 KiB, **1.1× less** | 0 KiB → 0 KiB, same disk usage |
+| git-twig (10 in a row) | 5.5 MiB → 648 KiB, **8.6× less** | 5.4 MiB → 680 KiB, **8.1× less** | 5.2 MiB → 1.4 MiB, **3.7× less** | 4.0 MiB → 1.1 MiB, **3.5× less** |
+| Axo | 31.8 MiB → 1.4 MiB, **22.9× less** | 31.2 MiB → 1.8 MiB, **17.8× less** | 31.4 MiB → 4.0 MiB, **7.9× less** | 27.3 MiB → 6.0 MiB, **4.6× less** |
+| OpenClaw | 920 MiB → 29.9 MiB, **30.8× less** | 925 MiB → 46.2 MiB, **20.0× less** | 953 MiB → 112 MiB, **8.5× less** | 820 MiB → 197 MiB, **4.2× less** |
+| Pulumi docs | 1.2 GiB → 7.6 MiB, **162.1× less** | 1.2 GiB → 11.8 MiB, **105.2× less** | 1.2 GiB → 23.1 MiB, **54.3× less** | 1.2 GiB → 50.9 MiB, **24.0× less** |
+| Linux kernel | 1.8 GiB → 43.4 MiB, **43.3× less** | 1.8 GiB → 70.6 MiB, **26.8× less** | 1.8 GiB → 171 MiB, **11.1× less** | not measured |
 
 **Time until the worktree is ready**
 
-| Repo | Linux · XFS | Linux · Btrfs | Windows · Dev Drive |
-|---|---|---|---|
-| Workers starter (10 in a row) | 162ms → 966ms | 168ms → 1.07s | 3.47s → 28.06s |
-| git-twig (10 in a row) | 259ms → 1.15s | 265ms → 1.24s | 3.80s → 29.25s |
-| Axo | 379ms → 810ms | 381ms → 822ms | 1.75s → 7.79s |
-| OpenClaw | 6.84s → 12.70s | 8.15s → 12.47s | 32.07s → 1m43s |
-| Pulumi docs | 4.94s → 2.80s | 5.93s → 3.40s | 13.58s → 24.01s |
-| Linux kernel | 10.92s → 15.60s | 12.52s → 12.77s | not measured |
+| Repo | macOS · APFS | Linux · XFS | Linux · Btrfs | Windows · Dev Drive |
+|---|---|---|---|---|
+| Workers starter (10 in a row) | 323ms → 2.64s | 162ms → 966ms | 168ms → 1.07s | 3.47s → 28.06s |
+| git-twig (10 in a row) | 419ms → 2.79s | 259ms → 1.15s | 265ms → 1.24s | 3.80s → 29.25s |
+| Axo | 470ms → 765ms | 379ms → 810ms | 381ms → 822ms | 1.75s → 7.79s |
+| OpenClaw | 8.66s → 14.87s | 6.84s → 12.70s | 8.15s → 12.47s | 32.07s → 1m43s |
+| Pulumi docs | 5.99s → 3.71s | 4.94s → 2.80s | 5.93s → 3.40s | 13.58s → 24.01s |
+| Linux kernel | 13.32s → 42.34s | 10.92s → 15.60s | 12.52s → 12.77s | not measured |
 
 `git worktree` → `git twig`. Space is the disk the new worktrees add; time is creation plus the first `git status`, when a worktree is ready to use. Workers starter and git-twig rows are 10 worktrees created in a row, the others one. Medians of three paired rounds on fresh filesystem images. † Includes failed Git attempts. [Setup, every metric and raw results](bench/results/readme-details.md).
 
 <!-- twig-bench:end -->
 
 Savings grow with repository size, because the files Twig shares are the bulk
-of a checkout while Git's own metadata stays per worktree. Linux XFS shares the
-most; Btrfs and Windows ReFS keep more per worktree (ReFS, for example, keeps
+of a checkout while Git's own metadata stays per worktree. macOS APFS and Linux
+XFS share the most; Btrfs and Windows ReFS keep more per worktree (ReFS, for example, keeps
 the last partial cluster of every file private). Twig often takes longer to
 create a worktree than Git does, because it verifies every shared file before
-handing it over; on Linux, Pulumi is faster with Twig.
+handing it over; Pulumi is faster with Twig on macOS and Linux.
 
 ## Organize existing worktrees
 

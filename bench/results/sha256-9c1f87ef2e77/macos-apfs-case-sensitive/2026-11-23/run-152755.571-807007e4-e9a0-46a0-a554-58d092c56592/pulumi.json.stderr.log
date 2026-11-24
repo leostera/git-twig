@@ -1,0 +1,30 @@
+pulumi: git, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  5.55s creates; 1 ok / 0 failed; allocation after status: 1237.72 MiB
+  disposable image detached and removed
+pulumi: twig, repeat 1/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  6.13s creates; 1 ok / 0 failed; allocation after status: 7.77 MiB
+  disposable image detached and removed
+pulumi: twig, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  6.15s creates; 1 ok / 0 failed; allocation after status: 6.91 MiB
+  disposable image detached and removed
+pulumi: git, repeat 2/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  5.33s creates; 1 ok / 0 failed; allocation after status: 1238.58 MiB
+  disposable image detached and removed
+pulumi: git, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+git: CLI completed 1/1; content verification pending
+  5.33s creates; 1 ok / 0 failed; allocation after status: 1238.00 MiB
+  disposable image detached and removed
+pulumi: twig, repeat 3/3, 1 creates with concurrency 1
+cohort workers launched: 1; queued creates: 1
+twig: CLI completed 1/1; content verification pending
+  6.26s creates; 1 ok / 0 failed; allocation after status: 7.64 MiB
+  disposable image detached and removed

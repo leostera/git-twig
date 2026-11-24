@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "first-stable-complete-paired-jobs",
+  "candidateSha256": "9c1f87ef2e77af6389e10011d595ea5e5af1391d10371d40a53e030a6e102bf5",
+  "source": "60129e4f5406b3fc7222d1317d33fee168b06113",
+  "budgetSeconds": 21600,
+  "maximumAttemptsPerRepository": 3,
+  "minimumFreeGiB": 128,
+  "maximumGrowthGiB": 160,
+  "status": "completed",
+  "attempts": [
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "linux",
+      "attempt": 1,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-161240.658-647ed65c-0097-4053-86bc-d3070f12e324/manifest.json",
+      "accepted": false,
+      "stopReason": "Error: Allocation did not settle; retain this complete attempt and rerun the entire paired repository job, never select individual cohorts"
+    },
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "linux",
+      "attempt": 2,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    }
+  ],
+  "accepted": [
+    {
+      "target": "macos-apfs-case-sensitive",
+      "repository": "linux",
+      "attempt": 2,
+      "manifest": "bench/results/sha256-9c1f87ef2e77/macos-apfs-case-sensitive/2026-11-23/run-164429.516-c74b81e8-a444-4476-ba10-a63f63695b7d/manifest.json",
+      "accepted": true,
+      "stopReason": null
+    }
+  ],
+  "error": null
+}

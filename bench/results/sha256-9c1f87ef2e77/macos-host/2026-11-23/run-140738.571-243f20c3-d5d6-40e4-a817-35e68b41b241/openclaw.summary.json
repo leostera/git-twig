@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "repository": "openclaw",
+  "filesystem": "host",
+  "summary": [
+    {
+      "backend": "git",
+      "rounds": 3,
+      "operations": 3,
+      "allocationComparable": false,
+      "batchCreateMedianMs": 8206.31575,
+      "createsPerSecondMedian": 0.12185736333628157,
+      "logicalBytesPerSecondMedian": 94585666.41187307,
+      "createP50Ms": 8206.241083,
+      "createP95Ms": 8454.896917,
+      "createP99Ms": 8454.896917,
+      "createMaxMs": 8454.896917,
+      "firstStatusP50Ms": 281.142208,
+      "allocationMedianBytes": null,
+      "allocationMinBytes": null,
+      "allocationMaxBytes": null,
+      "maxHarnessCpuWallRatio": 0.0003301115972774123
+    },
+    {
+      "backend": "twig",
+      "rounds": 3,
+      "operations": 3,
+      "allocationComparable": false,
+      "batchCreateMedianMs": 14718.079208000001,
+      "createsPerSecondMedian": 0.0679436484793784,
+      "logicalBytesPerSecondMedian": 52737849.35048435,
+      "createP50Ms": 14717.992167,
+      "createP95Ms": 15123.211125,
+      "createP99Ms": 15123.211125,
+      "createMaxMs": 15123.211125,
+      "firstStatusP50Ms": 149.54125,
+      "allocationMedianBytes": null,
+      "allocationMinBytes": null,
+      "allocationMaxBytes": null,
+      "maxHarnessCpuWallRatio": 0.00008927795410204756
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+workers-starter: git, repeat 1/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  0.26s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-git-0.mount
+workers-starter: twig, repeat 1/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  2.54s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-twig-0.mount
+workers-starter: twig, repeat 2/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  2.55s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-twig-1.mount
+workers-starter: git, repeat 2/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  0.23s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-git-1.mount
+workers-starter: git, repeat 3/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+git: CLI completed 1/10; content verification pending
+git: CLI completed 2/10; content verification pending
+git: CLI completed 3/10; content verification pending
+git: CLI completed 4/10; content verification pending
+git: CLI completed 5/10; content verification pending
+git: CLI completed 6/10; content verification pending
+git: CLI completed 7/10; content verification pending
+git: CLI completed 8/10; content verification pending
+git: CLI completed 9/10; content verification pending
+git: CLI completed 10/10; content verification pending
+  0.23s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-git-2.mount
+workers-starter: twig, repeat 3/3, 10 creates with concurrency 1
+cohort workers launched: 1; queued creates: 10
+twig: CLI completed 1/10; content verification pending
+twig: CLI completed 2/10; content verification pending
+twig: CLI completed 3/10; content verification pending
+twig: CLI completed 4/10; content verification pending
+twig: CLI completed 5/10; content verification pending
+twig: CLI completed 6/10; content verification pending
+twig: CLI completed 7/10; content verification pending
+twig: CLI completed 8/10; content verification pending
+twig: CLI completed 9/10; content verification pending
+twig: CLI completed 10/10; content verification pending
+  2.55s creates; 10 ok / 0 failed; allocation after status: unmeasured on shared host filesystem
+  host fixtures retained at /Users/leostera/Developer/github.com/leostera/git-twig/main/target/v06-real/source/target/real-images/1795442858923-15700/workers-starter-twig-2.mount
