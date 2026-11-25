@@ -86,6 +86,16 @@ pub fn materialize(
                         clone_planned_files(&files, modes)?;
                         continue;
                     }
+                    // A directory clone copies everything under it, ignored trees
+                    // included (nested worktrees, node_modules, build caches),
+                    // and normalize then deletes them again. Clone whole only the
+                    // subtrees that hold nothing Git does not track, and go file
+                    // by file just along the way to untracked entries.
+                    let mut plan = Plan::default();
+                    if !plan.directory(&source, &target, directory)? {
+                        directories += plan.run(modes)?;
+                        continue;
+                    }
                     native::clone_path(&source, &target)?;
                     directories += 1;
                 }
@@ -205,6 +215,118 @@ fn clone_planned_files(files: &[PlannedFile], modes: &native::FileModes) -> Resu
 #[cfg(any(target_os = "macos", target_os = "linux", windows, test))]
 fn clone_worker_count(files: usize, cpus: usize) -> usize {
     if files >= 1024 { cpus.clamp(1, 8) } else { 1 }
+}
+
+/// How to clone one top-level donor directory that holds untracked entries:
+/// whole-directory clones for its clean subtrees, and directories, symlinks and
+/// single-file clones on the way to the untracked entries.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct Plan<'a> {
+    steps: Vec<Step<'a>>,
+    files: Vec<PlannedFile>,
+}
+
+#[cfg(target_os = "macos")]
+enum Step<'a> {
+    Create(std::path::PathBuf),
+    Clone {
+        source: std::path::PathBuf,
+        target: std::path::PathBuf,
+        node: &'a Node,
+    },
+    Symlink {
+        source: std::path::PathBuf,
+        target: std::path::PathBuf,
+    },
+}
+
+#[cfg(target_os = "macos")]
+impl<'a> Plan<'a> {
+    /// Plan a tracked directory and report whether the donor holds nothing in
+    /// it that Git does not track, in which case the caller clones it whole and
+    /// drops what this call planned. Reads each tracked directory once and
+    /// never descends into an untracked entry. Only a hint: normalize and
+    /// verification still check every byte afterwards.
+    fn directory(
+        &mut self,
+        source: &Path,
+        target: &Path,
+        directory: &'a Directory,
+    ) -> Result<bool> {
+        let mut clean = true;
+        for child in fs::read_dir(source)? {
+            let child = child?;
+            match directory.children.get(&child.file_name()) {
+                Some(node) if same_kind(node, child.file_type()?) => {}
+                _ => clean = false,
+            }
+        }
+        self.steps.push(Step::Create(target.to_path_buf()));
+        for (name, node) in &directory.children {
+            let source = source.join(name);
+            let target = target.join(name);
+            match node {
+                Node::Directory(child) => {
+                    if !still_tracked_kind(&source, node)? {
+                        continue;
+                    }
+                    let (steps, files) = (self.steps.len(), self.files.len());
+                    if self.directory(&source, &target, child)? {
+                        self.steps.truncate(steps);
+                        self.files.truncate(files);
+                        self.steps.push(Step::Clone {
+                            source,
+                            target,
+                            node,
+                        });
+                    } else {
+                        clean = false;
+                    }
+                }
+                Node::File { executable } => self.files.push(PlannedFile {
+                    source,
+                    target,
+                    executable: *executable,
+                }),
+                Node::Symlink => self.steps.push(Step::Symlink { source, target }),
+            }
+        }
+        Ok(clean)
+    }
+
+    /// Create the planned directories and clones; returns how many whole
+    /// directories were cloned.
+    fn run(self, modes: &native::FileModes) -> Result<usize> {
+        let mut directories = 0;
+        for step in self.steps {
+            match step {
+                // As in plan_tracked_directory: mkdir applies umask like Git.
+                Step::Create(target) => fs::create_dir(&target)?,
+                Step::Clone {
+                    source,
+                    target,
+                    node,
+                } => {
+                    native::clone_path(&source, &target)?;
+                    normalize(
+                        &target,
+                        node,
+                        fs::symlink_metadata(&target)?.file_type(),
+                        modes,
+                    )?;
+                    directories += 1;
+                }
+                Step::Symlink { source, target } => {
+                    if still_tracked_kind(&source, &Node::Symlink)? {
+                        native::symlink(&fs::read_link(&source)?, &target)?;
+                    }
+                }
+            }
+        }
+        clone_planned_files(&self.files, modes)?;
+        Ok(directories)
+    }
 }
 
 /// Whether a donor path still holds the kind of entry the target tracks there.
@@ -330,6 +452,66 @@ mod tests {
         assert_eq!(clone_worker_count(1024, 64), 8);
         assert_eq!(clone_worker_count(100_000, 2), 2);
         assert_eq!(clone_worker_count(100_000, 1), 1);
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn plans_whole_clones_only_for_subtrees_without_untracked_entries() {
+        let root = std::env::temp_dir().join(format!("twig-plan-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        for package in ["a", "b"] {
+            fs::create_dir_all(root.join("packages").join(package).join("src")).unwrap();
+            fs::write(root.join("packages").join(package).join("src/index.js"), "").unwrap();
+        }
+        let mut tree = Directory::default();
+        for package in ["a", "b"] {
+            tree.insert(
+                &[
+                    "packages".into(),
+                    package.into(),
+                    "src".into(),
+                    "index.js".into(),
+                ],
+                Kind::File { executable: false },
+            )
+            .unwrap();
+        }
+        let Node::Directory(packages) = &tree.children[&OsString::from("packages")] else {
+            unreachable!()
+        };
+        let target = root.join("target");
+        let clones = |plan: &Plan| -> Vec<std::path::PathBuf> {
+            plan.steps
+                .iter()
+                .filter_map(|step| match step {
+                    Step::Clone { source, .. } => {
+                        Some(source.strip_prefix(&root).unwrap().to_path_buf())
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut plan = Plan::default();
+        assert!(
+            plan.directory(&root.join("packages"), &target, packages)
+                .unwrap()
+        );
+
+        fs::create_dir_all(root.join("packages/b/node_modules/dep")).unwrap();
+        let mut plan = Plan::default();
+        assert!(
+            !plan
+                .directory(&root.join("packages"), &target, packages)
+                .unwrap()
+        );
+        assert_eq!(
+            clones(&plan),
+            [
+                std::path::PathBuf::from("packages/a"),
+                "packages/b/src".into()
+            ]
+        );
+        assert!(plan.files.is_empty());
+        fs::remove_dir_all(&root).unwrap();
     }
     #[test]
     fn rejects_duplicate_paths() {

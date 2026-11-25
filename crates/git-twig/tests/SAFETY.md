@@ -14,6 +14,7 @@ independent reflink probe prevents silently testing fallback instead.
 | Target revision, not donor index, determines output | 12 deterministic SHA-1/SHA-256 cases; dirty/staged/missing files and changed modes; compare with independently created stock worktree |
 | Raw output equals stock checkout | Exact recursive inventory, raw file bytes, executable bits, symlink targets; LF/CRLF attributes, binary data, Unicode/tab/newline paths |
 | Ignored files cannot escape into the target | Root/nested/deep dependency directories, each containing small files and a symlink outside the clone |
+| Ignored files never enter staging (macOS) | A tracked tree with Finder litter and one package's `node_modules`: only clean subtrees are directory clones (exact count), the rest is cloned file by file, and nothing untracked reaches the target or remains in staging |
 | Source and source index remain untouched | Snapshot before creation, compare afterward, then mutate every private regular file and compare source again |
 | No hardlinks to donor | Compare device/inode pairs for every surviving source regular file |
 | Existing destinations stay untouched | Nonempty directory, file, symlink, dangling symlink; compare user inventory, outside sentinel, and Git registration |

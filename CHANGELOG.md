@@ -6,6 +6,18 @@ describe changes from this baseline after they are implemented and verified.
 
 ## Unreleased
 
+### Fixed
+
+- macOS: untracked and ignored files inside tracked directories are no longer
+  copied into staging and deleted again. A directory is cloned whole only when
+  everything in it is tracked; the directories leading to untracked entries are
+  cloned file by file, and every clean directory beside them is still cloned
+  whole. With nested worktrees and their `node_modules` under a tracked
+  `.claude/`, creating a worktree went from over 10 minutes to about 5 s in the
+  report, and from 7.1 s to 1.0 s in our reproduction. A clean repository pays
+  one extra pass over its tracked directories: about 1 s on Kibana's 136k
+  files. Issue #12 (luigiplr).
+
 ## [0.6.0] — 2026-11-23
 
 Windows support: native sharing on ReFS and Dev Drive, `adopt`, Scoop and

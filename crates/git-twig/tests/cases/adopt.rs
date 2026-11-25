@@ -208,7 +208,9 @@ fn inspection_and_preparation_preserve_existing_dirty_staged_worktrees() -> Resu
             assert!(stdout.contains("match \"staged.txt\""), "{stdout}");
             assert!(stdout.contains("skip \"different\""), "{stdout}");
             assert!(stdout.contains("skip \"sub/file\""), "{stdout}");
-            assert!(!stdout.contains("untracked"), "{stdout}");
+            // The file name as the report quotes it: fixture paths may contain
+            // the word, as in a checkout named fix-macos-untracked-trees.
+            assert!(!stdout.contains("\"untracked\""), "{stdout}");
             assert_eq!(files(&f.source)?, before_source);
             assert_eq!(files(&f.destination())?, before_target);
             #[cfg(target_os = "macos")]

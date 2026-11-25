@@ -1,6 +1,6 @@
 # RFD0010 — Bulk directory cloning
 
-- Status: implementation snapshot
+- Status: implementation snapshot (amended; clean subtrees only, issue #12)
 - Author: leostera
 - Date: 2026-11-15
 
@@ -17,8 +17,8 @@ These are correctness probes, not performance claims.
 ## Contract
 
 Build a typed directory trie from Git's parsed committed inventory. Bulk-clone each
-tracked root directory, clone root regular files individually, and recreate root
-symlinks. Never clone the repository root: its .git and unrelated root trees are
+tracked root directory that holds nothing Git does not track, clone root regular
+files individually, and recreate root symlinks. Never clone the repository root: its .git and unrelated root trees are
 not included. All clones reject source-path symlink traversal.
 
 Reduce each private cloned subtree to its tracked inventory. Remove unexpected
@@ -40,6 +40,24 @@ Git still owns linked-worktree registration, refs, hooks and index construction.
 Do not copy Rift's independent .git/repository snapshot semantics. Do not reuse the
 staged index in this change: isolate directory-cloning effects first.
 
+(amended; clean subtrees only, issue #12) A tracked root directory that holds an
+untracked or ignored entry anywhere below it is not cloned whole. One pass reads
+each tracked donor directory once, never descending into an untracked entry, and
+marks a directory clean when every entry in it is tracked with the same type and
+every tracked subdirectory is clean. Clean subtrees are cloned whole and pruned as
+before; the directories on the way to an untracked entry are created, and their
+own files and symlinks cloned one by one. The pass is only a hint: pruning,
+normalization and verification still check every staged entry, so a donor that
+changes between the pass and the clone costs time, never correctness. Ignored
+trees, such as nested worktrees with `node_modules` under a tracked `.claude/`,
+are therefore never copied into staging, which also keeps their contents (for
+example `.env` files) out of retained staging after a failure. Measured on one
+MacBook: a clone of this repository with a tracked `.claude/settings.json` and
+78,870 ignored files under `.claude/worktrees/` went from 7.1 s to 1.0 s; a clean
+Kibana clone (136,265 tracked files) went from 44.8 s to 45.8 s for the extra pass,
+with the same 25 directory clones. Issue #12 reported more than 10 minutes to about
+5 s on its monorepo.
+
 ## Validation and reporting
 
 Retain existing compatibility tests. Add directory-clone selection, nested ignored
@@ -56,10 +74,10 @@ from data. Profiling timings are not the baseline for an improvement claim.
 
 Cloning the entire root also clones .git and unrelated dependencies needlessly.
 Per-file cloning is simpler to filter but repeats ancestor checks, directory
-creation and clone syscalls. A maximal clean-subtree planner could avoid cloning
-nested ignored dependencies but adds inventory/selection complexity; defer until
-measured need. Bulk-clone-plus-prune can be expensive when a tracked subtree holds
-large ignored directory trees. It still requires per-entry permission normalization
+creation and clone syscalls. A maximal clean-subtree planner avoids cloning
+nested ignored dependencies; it was deferred until measured need, which issue #12
+supplied (amended; see Contract). Bulk-clone-plus-prune was expensive when a tracked
+subtree held large ignored directory trees. It still requires per-entry permission normalization
 and Git content verification. No speedup is assumed before the release comparison.
 
 ## Recorded comparison

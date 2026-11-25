@@ -1475,7 +1475,9 @@ fn directory_clones_filter_extras_without_following_links() -> Result<()> {
     let output = checked(f.add()?)?;
     native(&output);
     if cfg!(target_os = "macos") {
-        assert!(String::from_utf8_lossy(&output.stderr).contains("APFS directory clones: 1"));
+        // A tree holding untracked or ignored entries is cloned file by file,
+        // so those entries are never copied into staging at all.
+        assert!(String::from_utf8_lossy(&output.stderr).contains("APFS directory clones: 0"));
         assert!(f.stages()?.is_empty());
         f.assert_no_sibling_stages()?;
     }
@@ -1494,6 +1496,71 @@ fn directory_clones_filter_extras_without_following_links() -> Result<()> {
     assert_eq!(fs::read(tree.join("a"))?, b"same\n");
     assert_eq!(fs::read(outside.join("keep"))?, b"untouched");
     assert_eq!(git(&f.source, &["status", "--porcelain"])?.stdout, before);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn only_tracked_directories_are_cloned_whole() -> Result<()> {
+    let f = Fixture::new()?;
+    for name in ["clean", "dirty"] {
+        let tree = f.source.join(name).join("deep");
+        fs::create_dir_all(&tree)?;
+        fs::write(tree.join("file"), name)?;
+    }
+    git(&f.source, &["add", "."])?;
+    git(&f.source, &["commit", "-m", "two trees"])?;
+    let cache = f.source.join("dirty/deep/node_modules/pkg");
+    fs::create_dir_all(&cache)?;
+    fs::write(cache.join("index.js"), "excluded")?;
+    let output = checked(f.add()?)?;
+    native(&output);
+    assert!(String::from_utf8_lossy(&output.stderr).contains("APFS directory clones: 1"));
+    let destination = f.destination();
+    assert_eq!(fs::read(destination.join("clean/deep/file"))?, b"clean");
+    assert_eq!(fs::read(destination.join("dirty/deep/file"))?, b"dirty");
+    assert!(!destination.join("dirty/deep/node_modules").exists());
+    Ok(())
+}
+
+/// One untracked entry deep in a tree must not cost the rest of that tree its
+/// directory clones: only the directories on the way to it go file by file.
+#[cfg(target_os = "macos")]
+#[test]
+fn clean_subtrees_beside_untracked_entries_are_cloned_whole() -> Result<()> {
+    let f = Fixture::new()?;
+    for package in ["a", "b", "c"] {
+        let tree = f.source.join("packages").join(package).join("src");
+        fs::create_dir_all(&tree)?;
+        fs::write(tree.join("index.js"), package)?;
+    }
+    git(&f.source, &["add", "."])?;
+    git(&f.source, &["commit", "-m", "packages"])?;
+    // Finder litter at the top and one package's dependencies.
+    fs::write(f.source.join("packages/.DS_Store"), "finder")?;
+    let modules = f.source.join("packages/b/node_modules/dep");
+    fs::create_dir_all(&modules)?;
+    fs::write(modules.join("index.js"), "excluded")?;
+    let output = checked(f.add()?)?;
+    native(&output);
+    // packages/a, packages/c and packages/b/src are clean; packages and
+    // packages/b lead to untracked entries.
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("APFS directory clones: 3"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let destination = f.destination();
+    for package in ["a", "b", "c"] {
+        let file = destination
+            .join("packages")
+            .join(package)
+            .join("src/index.js");
+        assert_eq!(fs::read(file)?, package.as_bytes());
+    }
+    assert!(!destination.join("packages/.DS_Store").exists());
+    assert!(!destination.join("packages/b/node_modules").exists());
+    assert!(f.stages()?.is_empty());
     Ok(())
 }
 
