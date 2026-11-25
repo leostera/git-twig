@@ -27,10 +27,11 @@ formula for macOS and Linux, and a Scoop manifest for Windows. It generates note
 that tag, and commits Formula/git-twig.rb and bucket/git-twig.json on current main.
 A last job, behind the same release environment, assembles the `git-twig` npm
 package from the released archives (`scripts/npm-package.py`) and publishes it
-with provenance. It needs an npm automation token with publish rights to
-`git-twig` as the `NPM_TOKEN` secret of the release environment; after the first
-publish, npm trusted publishing for this workflow can replace the token. A rerun
-skips a version npm already has. SHA256SUMS uses archive
+with provenance through npm trusted publishing: npm trusts `release.yml` in the
+`release` environment of leostera/git-twig, and the job's OIDC token replaces any
+npm secret (none exists). 0.6.0, the first version, was published by hand and has
+no provenance; later versions publish only from this job. A rerun skips a version
+npm already has. SHA256SUMS uses archive
 basenames so a download can be checked with `sha256sum -c SHA256SUMS`. Native CoW supports macOS/APFS, Linux on Btrfs or
 reflink-enabled XFS, and Windows ReFS including Dev Drive; unsupported filesystems
 (including NTFS) delegate to Git. The Windows binary is not Authenticode-signed. macOS binaries are

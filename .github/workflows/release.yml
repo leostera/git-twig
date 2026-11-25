@@ -106,8 +106,15 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+      # npm trusted publishing: npm exchanges this job's OIDC token (id-token:
+      # write) for a short-lived publish token, so no npm secret exists. It is
+      # configured for release.yml in the release environment and needs npm
+      # 11.5.1 or newer. Provenance is attached automatically.
       - run: |
           version="${GITHUB_REF_NAME#v}"
+          npm --version
+          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$(npm --version)" \
+            || { echo "npm trusted publishing needs npm 11.5.1 or newer" >&2; exit 1; }
           package=$(python3 scripts/npm-package.py "$version" --dist dist --out "$RUNNER_TEMP/npm")
           # A rerun after a successful publish must not fail the release.
           if npm view "git-twig@$version" version >/dev/null 2>&1; then
@@ -115,5 +122,3 @@ jobs:
           else
             npm publish --provenance --access public "$package"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
