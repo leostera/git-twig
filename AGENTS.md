@@ -6,7 +6,7 @@ Integration: direct to main, after local tests. Do not publish or tag releases w
 Use Twig for sibling working checkouts. Fast-forward tested, coherent increments into
 main promptly; a local commit is not integrated work. Promote experiments through a
 fresh concurrency branch, and keep explicitly rejected prototypes out of main.
-For releases, read docs/skills/git-twig-release/SKILL.md. Keep maintainer process
+For releases, read .agents/skills/git-twig-release/SKILL.md. Keep maintainer process
 out of the user README and separate from the bundled worktree-use skill.
 Never claim full Git worktree compatibility; unsupported operations are delegated.
 Run cargo fmt --all --check, cargo clippy --workspace --all-targets -- -D warnings,

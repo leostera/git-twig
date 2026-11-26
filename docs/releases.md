@@ -3,7 +3,7 @@
 Version 0.5.0 is published on [crates.io](https://crates.io/crates/git-twig) and
 [GitHub](https://github.com/leostera/git-twig/releases/tag/v0.5.0).
 Crates.io publication is manual and requires owner approval.
-The [maintainer release skill](skills/git-twig-release/SKILL.md) covers the complete
+The [maintainer release skill](../.agents/skills/git-twig-release/SKILL.md) covers the complete
 prepare, publish, verify and deploy sequence, including recovery boundaries.
 
 Before publishing:
