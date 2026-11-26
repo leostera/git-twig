@@ -159,3 +159,92 @@ fn writable_mapped_donor_edits_are_not_inherited() -> Result<()> {
     assert_eq!(unsafe { libc::munmap(mapping, 65536) }, 0);
     result
 }
+
+/// Git's hash-object fails like the read error seen on macOS disk images
+/// ("read error while indexing <unknown>: Unknown error: 999"), either once
+/// or every time. Returns the create's output and how often it failed.
+#[cfg(unix)]
+fn create_with_failing_hashes(f: &Fixture, failures: &str) -> Result<(Output, usize)> {
+    use std::os::unix::fs::PermissionsExt;
+    let bin = f.root.join("bin");
+    fs::create_dir(&bin)?;
+    let wrapper = bin.join("git");
+    fs::write(
+        &wrapper,
+        r#"#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = hash-object ]; then
+    if [ "$TWIG_TEST_FAILURES" = always ] || [ ! -e "$TWIG_TEST_MARKER" ]; then
+      printf 'failed\n' >> "$TWIG_TEST_MARKER"
+      cat > /dev/null
+      echo 'error: read error while indexing <unknown>: Unknown error: 999' >&2
+      exit 128
+    fi
+  fi
+done
+exec "$TWIG_TEST_REAL_GIT" "$@"
+"#,
+    )?;
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755))?;
+    let real_git = String::from_utf8(
+        checked(
+            command("sh", &f.source)
+                .args(["-c", "command -v git"])
+                .output()?,
+        )?
+        .stdout,
+    )?;
+    let path = std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    )))?;
+    let marker = f.root.join("marker");
+    let mut child = command(env!("CARGO_BIN_EXE_git-twig"), &f.source);
+    child
+        .args(["new", "-b", "feature", "../feature", "HEAD"])
+        .env("PATH", path)
+        .env("TWIG_TEST_REAL_GIT", real_git.trim())
+        .env("TWIG_TEST_FAILURES", failures)
+        .env("TWIG_TEST_MARKER", &marker);
+    let output = bounded_output(child)?;
+    let failed = fs::read_to_string(&marker)
+        .unwrap_or_default()
+        .lines()
+        .count();
+    Ok((output, failed))
+}
+
+#[cfg(unix)]
+#[test]
+fn a_transient_hash_read_error_keeps_native_sharing() -> Result<()> {
+    let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(());
+    }
+    let (output, failed) = create_with_failing_hashes(&f, "once")?;
+    let output = checked(output)?;
+    assert_eq!(failed, 1);
+    native(&output);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("retrying"), "{stderr}");
+    assert_eq!(fs::read(f.destination().join("hello.txt"))?, b"hello\n");
+    assert!(f.stages()?.is_empty());
+    clean(&f.destination())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_persistent_hash_read_error_delegates_to_git() -> Result<()> {
+    let f = Fixture::new()?;
+    if !cow_available(&f)? {
+        return Ok(());
+    }
+    let (output, failed) = create_with_failing_hashes(&f, "always")?;
+    let output = checked(output)?;
+    // One attempt and one retry, then stock Git writes every file.
+    assert_eq!(failed, 2);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("stock Git:"), "{stderr}");
+    assert!(stderr.contains("Unknown error: 999"), "{stderr}");
+    assert_eq!(fs::read(f.destination().join("hello.txt"))?, b"hello\n");
+    clean(&f.destination())
+}

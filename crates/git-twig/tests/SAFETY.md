@@ -19,6 +19,7 @@ independent reflink probe prevents silently testing fallback instead.
 | No hardlinks to donor | Compare device/inode pairs for every surviving source regular file |
 | Existing destinations stay untouched | Nonempty directory, file, symlink, dangling symlink; compare user inventory, outside sentinel, and Git registration |
 | One owner per destination | Four CLI calls launched from a barrier, with shared or distinct destinations; exact success/registration counts and contents |
+| Transient read errors keep sharing | A Git wrapper fails `hash-object` with the macOS disk-image read error once: the retry verifies every file and creation stays native. Failing every time delegates after exactly two attempts and stock Git writes a clean worktree |
 | Failure does not erase recovery evidence | Git wrapper performs real registration then fails or SIGKILLs Twig; also fails final read-tree after files are installed; inspect retained partial destination and staging |
 | Verified private snapshots survive donor edits | Mutate donor immediately after registration; target remains equal to original stock contents, donor edit survives |
 | Destination interference stops installation | Insert foreign file or source-pointing symlink after registration; neither it nor its target is overwritten |

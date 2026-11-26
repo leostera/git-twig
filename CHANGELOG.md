@@ -17,6 +17,10 @@ describe changes from this baseline after they are implemented and verified.
   report, and from 7.1 s to 1.0 s in our reproduction. A clean repository pays
   one extra pass over its tracked directories: about 1 s on Kibana's 136k
   files. Issue #12 (luigiplr).
+- A read error while verifying shared files is retried once before creation
+  falls back to stock Git. On macOS disk images, reading a freshly cloned file
+  occasionally failed with an error macOS does not define ("Unknown error:
+  999"), and three benchmark creates fell back to stock Git without sharing.
 
 ## [0.6.0] — 2026-11-23
 

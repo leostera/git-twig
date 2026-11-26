@@ -72,7 +72,7 @@ pub fn hash_private_files(
     std::thread::scope(|scope| {
         let handles: Vec<_> = batches
             .iter()
-            .map(|batch| scope.spawn(move || hash_batch(root, batch)))
+            .map(|batch| scope.spawn(move || hash_batch_retrying(root, batch)))
             .collect();
         let mut matched = vec![None; entries.len()];
         for handle in handles {
@@ -131,6 +131,19 @@ fn hash_worker_count(files: usize, bytes: u64, cpus: usize) -> usize {
     } else {
         1
     }
+}
+
+/// Hashing only reads Twig's own private files, so a failed batch is safe to
+/// repeat. On macOS disk images, read() of a freshly cloned file occasionally
+/// failed with an error the kernel does not define ("Unknown error: 999"). A
+/// second failure delegates the creation to stock Git as before.
+fn hash_batch_retrying(root: &Path, batch: &HashBatch<'_>) -> Result<Vec<(usize, Option<Stat>)>> {
+    hash_batch(root, batch).or_else(|error| {
+        crate::trace(&format!(
+            "raw verification failed, retrying once: {error:#}"
+        ));
+        hash_batch(root, batch)
+    })
 }
 
 fn hash_batch(root: &Path, batch: &HashBatch<'_>) -> Result<Vec<(usize, Option<Stat>)>> {

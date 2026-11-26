@@ -1,6 +1,6 @@
 # RFD0015 — Batched raw-object verification without blob inflation
 
-- Status: implementation snapshot
+- Status: implementation snapshot (amended; one retry per failed hash worker)
 - Author: leostera
 - Date: 2026-11-17
 
@@ -36,6 +36,15 @@ not claiming the reported slowdown is already proven fixed.
 - Output must contain exactly one valid object ID of the expected format per
   requested path, in order. Wrong counts, malformed hashes and child failures
   abort preparation and conservatively delegate before registration.
+- (amended; one retry per failed hash worker) A worker whose Git child fails, or
+  whose output is rejected, hashes its whole batch once more before preparation
+  aborts. Hashing only reads files this phase owns, so repeating it changes
+  nothing; the stat data recorded before the first attempt still bounds what the
+  index may claim, and a file that changed hashes unequal and is Git-written. On
+  macOS disk images, read() of a freshly cloned staging file occasionally failed with an
+  error the kernel does not define ("read error while indexing <unknown>: Unknown
+  error: 999"), so three of the 0.6.0 benchmark warmups delegated to stock Git
+  instead of sharing. A second failure still delegates, with both errors traced.
 - Large inventories (at least 512 regular files and 64 MiB) use up to four Git
   workers, capped by available CPU count. Largest-first byte balancing limits
   skew. Smaller inventories remain one process. No process per file.
