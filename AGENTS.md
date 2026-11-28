@@ -9,8 +9,13 @@ fresh concurrency branch, and keep explicitly rejected prototypes out of main.
 For releases, read .agents/skills/git-twig-release/SKILL.md. Keep maintainer process
 out of the user README and separate from the bundled worktree-use skill.
 Never claim full Git worktree compatibility; unsupported operations are delegated.
-Run cargo fmt --all --check, cargo clippy --workspace --all-targets -- -D warnings,
-and cargo test --workspace before committing.
+Run Cargo through cargo gc (https://cargo-gc.leostera.dev), so each worktree's
+target/ stays near the size of a clean build: cargo gc build, cargo gc test,
+cargo gc clippy. Install it with cargo install --git
+https://github.com/leostera/cargo-gc --locked, never cargo install cargo-gc. It
+removes only Cargo's own build units, never retained fixtures or other target/
+contents. Run cargo fmt --all --check, cargo gc clippy --workspace --all-targets
+-- -D warnings, and cargo gc test --workspace before committing.
 Benchmarks use release binaries, compare actual CLI operations, retain versioned JSON,
 and generate charts from those files. Never claim exclusive APFS allocation from du.
 Keep user source and existing destinations untouched. Never hardlink files to source.
